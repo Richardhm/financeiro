@@ -1,0 +1,135 @@
+=========================================================
+  ROTAS PARA TESTAR - SISTEMA FINANCEIRO
+  Gerado em: 2026-06-15
+  Base URL: http://localhost/financeiro/public
+=========================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. VENDEDORES / CORRETORES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  [GET] /corretores
+  → Tela de cadastro e listagem de vendedores
+  → TESTAR: cadastrar novo vendedor escolhendo CLT / PJ / Parceiro
+  → TESTAR: alterar tipo_contrato de um vendedor existente via select inline
+            (deve aparecer badge colorido: verde=CLT, azul=PJ, roxo=Parceiro)
+  → TESTAR: ligar/desligar vendedor (toggle switch)
+  → TESTAR: clicar no ícone de editar (olhinho) e verificar se tipo_contrato
+            preenche o formulário corretamente
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  2. FOLHA DE PAGAMENTO - TELA PRINCIPAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  [GET] /folha/america
+  → Tela principal da folha América
+  → TESTAR: verificar toolbar com os 5 botões novos:
+            - Comissão Corretora (teal)
+            - Regras PJ (amarelo)
+            - Faixas CLT (índigo)
+            - Parceiros (roxo)
+            - Pagar Parceiros (pink)
+  → TESTAR: verificar encoding (sem caracteres estranhos como "AmÃ©rica")
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  3. FAIXAS CLT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  [GET] /folha/america/faixas-clt
+  → Cadastro de faixas de desempenho para vendedores CLT
+  → CAMPOS: Vidas Mín / Vidas Máx / Produção Mín / Produção Máx / Percentual (%)
+  → TESTAR: cadastrar pelo menos 2 faixas (ex: 0-10 vidas = 30%, 11+ vidas = 40%)
+  → TESTAR: deletar uma faixa
+  → LÓGICA: no fechamento do mês, o sistema aplica a faixa ao vendedor CLT
+             baseado no total de vidas e produção da competência
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  4. PARCEIROS INDEPENDENTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  [GET] /folha/america/parceiros-config
+  → Config de frequência de pagamento para vendedores Parceiro
+  → CAMPOS: Vendedor / Frequência (semanal/quinzenal/mensal/personalizado) / Dias
+  → TESTAR: cadastrar config para um vendedor marcado como "Parceiro" em /corretores
+  → LEMBRAR: semanal usa dia da semana (1=Seg, 7=Dom);
+             quinzenal/mensal/personalizado usam dia do mês (1-31)
+
+  [GET] /folha/america/parceiros-pagamentos
+  → Gerar e visualizar pagamentos de parceiros
+  → TESTAR: clicar em "Preview" para ver quem recebe em uma data
+  → TESTAR: clicar em "Gerar Pagamentos" para confirmar os pagamentos
+  → TESTAR: seção de histórico para ver pagamentos já gerados
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  5. REGRAS PJ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  [GET] /folha/america/regras-pj
+  → CRUD de percentuais por parcela para vendedores PJ
+  → CAMPOS: Plano / Administradora / Vendedor (vazio = todos PJ) / Parcela / Percentual
+  → TESTAR: cadastrar regra genérica (vendedor vazio) — se aplica a todos PJ sem regra própria
+  → TESTAR: cadastrar regra específica para um vendedor — deve ter prioridade sobre a genérica
+  → LÓGICA: no cadastro de comissão (ProcessSpreadsheet), vendedor PJ usa essa tabela
+             enquanto vendedor CLT usa a tabela comissoes_corretores_default
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  6. COMISSÃO DA CORRETORA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  [GET] /folha/america/comissao-corretora
+  → Configuração do percentual que a corretora retém por parcela
+  → CAMPOS: Plano / Administradora / Vendedor (vazio = todos) / Parcela / Percentual (%)
+  → TESTAR: cadastrar configuração
+  → TESTAR: ver 4 cards de resumo do mês aberto:
+            - Total contratos
+            - Recebido dos clientes
+            - Pago aos vendedores
+            - Comissão da corretora
+  → TESTAR: botão "Recalcular" — recalcula valor_corretora nas comissões do mês aberto
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  7. OUTRAS ROTAS DO SISTEMA (REFERÊNCIA)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  [GET] /                → Dashboard / Home
+  [GET] /financeiro      → Listagem de contratos e baixas
+  [GET] /clientes        → Clientes individuais
+  [GET] /consultar       → Consultar carteirinha
+  [GET] /orcamento       → Cotação de planos
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SEQUÊNCIA DE TESTE SUGERIDA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. /corretores
+     → Marcar cada vendedor como CLT, PJ ou Parceiro
+     → Verificar badge colorido e select inline funcionando
+
+  2. /folha/america/faixas-clt
+     → Cadastrar faixas de comissão CLT
+
+  3. /folha/america/regras-pj
+     → Cadastrar regras de comissão PJ (genérica primeiro, depois por vendedor)
+
+  4. /folha/america/parceiros-config
+     → Configurar frequência de pagamento dos parceiros
+
+  5. /folha/america/comissao-corretora
+     → Configurar percentual da corretora
+     → Verificar cards de resumo do mês
+
+  6. /folha/america
+     → Verificar toolbar com todos os botões
+     → Testar fechamento do mês (finalizarMes) se houver dados
+
+  7. /folha/america/parceiros-pagamentos
+     → Preview e gerar pagamentos dos parceiros
+
+=========================================================
