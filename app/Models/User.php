@@ -3,15 +3,17 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Models\Traits\UserACLTrait;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    /** @use HasFactory<\Database\Factories\UserFactory> */
+    use HasFactory,Notifiable,UserACLTrait,HasApiTokens;
+
 
     /**
      * The attributes that are mass assignable.
@@ -19,9 +21,26 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'cargo_id',
+        'codigo_vendedor',
         'name',
         'email',
+        'uf_preferencia',
+        'corretora_id',
+        'ranking',
+        'cpf',
+        'endereco',
+        'cidade',
+        'estado',
+        'celular',
+        'numero',
+        'image',
         'password',
+        'admin',
+        'ativo',
+        'estagiario',
+        'clt',
+        'tipo_contrato',
     ];
 
     /**
@@ -46,4 +65,26 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'ranking' => 'boolean',
+        'admin' => 'boolean',
+        'ativo' => 'boolean',
+        'estagiario' => 'boolean',
+        'clt' => 'boolean',
+    ];
+
+
+    public function cargo()
+    {
+        return $this->belongsTo(Cargo::class);
+    }
+
+    public function codigo()
+    {
+        return $this->hasMany(CidadeCodigoVendedor::class);
+    }
+
+
 }

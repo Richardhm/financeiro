@@ -1,0 +1,80 @@
+.corretor-destaque {background-color: rgba(0, 128, 255, 0.5);transition: background-color 0.3s ease;border-radius: 5px;}
+
+#loading-overlay {position: fixed;top: 0;left: 0;right: 0;bottom: 0;background-color: rgba(0, 0, 0, 0.7);display: flex;justify-content: center;
+    align-items: center;z-index: 9999;opacity: 0;transition: opacity 0.3s ease;pointer-events: none;
+}
+#loading-overlay.active {opacity: 1;pointer-events: all;}
+.loading-spinner {width: 50px;height: 50px;border: 5px solid rgba(255, 255, 255, 0.3);border-radius: 50%;border-top-color: #4299e1;animation: spin 1s ease-in-out infinite;}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+.transition-fast {transition: all 0.15s ease;}
+.will-change-transform {will-change: transform;}
+#detalhes-cliente-modal {
+    position: fixed; /* Fixa na tela inteira */
+    inset: 0; /* Cobre toda a janela viewport */
+    z-index: 50; /* Deve ser maior que qualquer outro elemento na pÃ¡gina */
+    background-color: rgba(0, 0, 0, 0.6); /* Fundo preto translÃºcido */
+    justify-content: center;
+    align-items: center;
+}
+
+#detalhes-cliente-conteudo {
+    background: red !important; /* Fundo branco */
+    z-index: 100; /* Garante que o conteÃºdo fique Ã  frente do fundo translÃºcido */
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 90%; /* Responsivo */
+    max-height: 80%; /* Responsivo */
+    overflow-y: auto; /* Para rotaÃ§Ã£o caso o conteÃºdo seja muito longo */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Sombra elegante */
+}
+
+#container_table.overflow-y-auto,.max-h-96.overflow-y-auto {
+    scrollbar-width: thin; /* Para Firefox */
+    scrollbar-color: #2d3748 #1a88ff; /* Cor da barra e fundo */
+}
+
+/* Webkit (Chrome, Edge, Safari) */
+#container_table.overflow-y-auto::-webkit-scrollbar,.max-h-96.overflow-y-auto::-webkit-scrollbar {
+    width: 4px !important; /* Largura da barra vertical */
+    height: 4px !important; /* Altura da barra horizontal, caso necessÃ¡rio */
+}
+
+#container_table.max-h-96.overflow-y-auto::-webkit-scrollbar-track,.max-h-96.overflow-y-auto::-webkit-scrollbar-track {
+    background: #1a202c; /* Cor do fundo da barra */
+    border-radius: 5px; /* Tornar os cantos arredondados */
+}
+
+#container_table.max-h-96.overflow-y-auto::-webkit-scrollbar-thumb,.max-h-96.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #4a5568; /* Cor da barra de rolagem */
+    border-radius: 10px; /* Tornar os cantos arredondados */
+    border: 2px solid #1a202c; /* EspaÃ§amento ao redor da barra */
+}
+
+#container_table.max-h-96.overflow-y-auto:hover::-webkit-scrollbar-thumb,.max-h-96.overflow-y-auto:hover::-webkit-scrollbar-thumb {
+    background: #718096; /* Barra mais clara ao passar o mouse */
+}
+
+#detalhes-cliente-modal {
+    z-index: 9999 !important; /* Ganhe precedÃªncia sobre outros estilos */
+    position: fixed;
+}
+
+#modal-editar-comissao.hidden {
+    display: none;
+}
+
+/* Estado inicial: Modal oculta */
+#modal-editar-comissao.hidden {
+    opacity: 0; /* Transparente */
+    transform: scale(0.9); /* Reduzido */
+    pointer-events: none; /* NÃ£o clicÃ¡vel */
+}
+
+/* Estado final: Modal visÃ­vel */
+#modal-editar-comissao.visible {
+    opacity: 1; /* VisÃ­vel */
+    transform: scale(1); /* Tamanho normal */
+    pointer-events: auto; /* Ativa cliques */
+}

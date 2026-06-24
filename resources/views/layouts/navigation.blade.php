@@ -15,6 +15,18 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('dashboard.balanco')" :active="request()->routeIs('dashboard.balanco')">
+                        Balanço
+                    </x-nav-link>
+                    <x-nav-link :href="route('financeiro.index')" :active="request()->routeIs('financeiro.*')">
+                        Financeiro
+                    </x-nav-link>
+                    <x-nav-link :href="route('folha.america.index')" :active="request()->routeIs('folha.america.*')">
+                        Folha CLT/PJ
+                    </x-nav-link>
+                    <x-nav-link :href="route('folha.america.folha-parceiros')" :active="request()->routeIs('folha.america.folha-parceiros*')">
+                        Folha Parceiros
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -43,7 +55,7 @@
                             @csrf
 
                             <x-dropdown-link :href="route('logout')"
-                                    onclick="event.preventDefault();
+                                             onclick="event.preventDefault();
                                                 this.closest('form').submit();">
                                 {{ __('Log Out') }}
                             </x-dropdown-link>
@@ -89,7 +101,7 @@
                     @csrf
 
                     <x-responsive-nav-link :href="route('logout')"
-                            onclick="event.preventDefault();
+                                           onclick="event.preventDefault();
                                         this.closest('form').submit();">
                         {{ __('Log Out') }}
                     </x-responsive-nav-link>
