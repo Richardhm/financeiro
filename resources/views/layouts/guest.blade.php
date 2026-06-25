@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
@@ -25,16 +25,19 @@
             background-attachment: fixed;
 
         }
+        .container_login { background: #0d1117 !important; background-image: none !important; }
         .container_formulario {
-            background:rgba(254,254,254,0.18);
-            backdrop-filter: blur(15px);
+            background: #141824;
+            border: 1px solid rgba(249,115,22,0.4);
+            border-radius: 14px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6);
         }
     </style>
 </head>
-<body class="font-sans text-gray-900 antialiased">
-<div class="container_login min-h-screen flex items-center justify-center px-4 sm:px-0 bg-red-600 dark:bg-gray-900">
+<body class="font-sans antialiased" style="background:#0d1117">
+<div class="container_login min-h-screen flex items-center justify-center px-4 sm:px-0">
     <!-- Form Container -->
-    <div class="container_formulario w-full sm:max-w-md px-6 py-12 bg-transparent border border-white dark:bg-gray-800 shadow-md sm:rounded-lg">
+    <div class="container_formulario w-full sm:max-w-4xl p-0 overflow-hidden">
         {{ $slot }}
     </div>
 </div>
