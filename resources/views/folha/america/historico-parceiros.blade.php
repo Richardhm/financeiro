@@ -52,7 +52,7 @@
             <div class="flex items-center justify-between flex-wrap gap-2">
                 <div>
                     <h1 class="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-                        Histórico de Folhas — Parceiros Independentes
+                        Histórico de Folhas Parceiros Independentes
                     </h1>
                     <p class="text-sm text-gray-400 mt-0.5">Regenere PDFs de qualquer período finalizado</p>
                 </div>
