@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
@@ -87,6 +87,139 @@
 
 
 
+    </style>
+    <style>
+        /* ── Override visual cadastro coletivo ── */
+        *, *::before, *::after { box-sizing: border-box; }
+        body { background: #0d1117 !important; overflow-x: hidden; }
+
+        /* Container do formulário */
+        .bg-\[rgba\(254\2c 254\2c 254\2c 0\.18\)\] {
+            background: #0d1117 !important;
+            backdrop-filter: none !important;
+            border: none !important;
+            max-width: 100% !important;
+            width: 100% !important;
+        }
+
+        /* ── Blocos ── */
+        .cc-bloco {
+            background: #141824;
+            border: 1px solid rgba(249,115,22,0.35);
+            border-radius: 10px;
+            padding: 16px 18px 14px;
+            margin-bottom: 14px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .cc-row { display:flex; gap:14px; margin-bottom:14px; }
+        .cc-row > .cc-bloco { margin-bottom:0; }
+        .cc-bloco-titulo {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #f97316;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #1e2a3e;
+        }
+        .cc-grid { display: grid; gap: 10px 14px; width: 100%; }
+        .cc-cols-3 { grid-template-columns: repeat(3, 1fr); }
+        .cc-cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+        .cc-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .cc-field label {
+            font-size: 0.73rem;
+            font-weight: 500;
+            color: #f97316;
+            white-space: nowrap;
+        }
+        .cc-field input, .cc-field select {
+            background: #1a2030;
+            border: 1px solid #252f44;
+            border-radius: 6px;
+            color: #dde6f5;
+            font-size: 0.84rem;
+            padding: 7px 10px;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .cc-field input:focus, .cc-field select:focus { border-color: #3a6aaa; }
+        .cc-field input::placeholder { color: #3e4e68; }
+        .cc-field select option { background: #141824; color: #dde6f5; }
+        .cc-error { font-size: 0.72rem; color: #f87171; min-height: 1rem; }
+
+        /* Labels da seção de faixas etárias */
+        label.text-white, span.text-white { color: #6a80a8 !important; font-size: 0.76rem !important; }
+
+        /* Faixas etárias */
+        section .border.border-white.rounded { border-color: #252f44 !important; border-radius: 6px !important; overflow: hidden; }
+        section .border.border-white.rounded input { background: #1a2030 !important; color: #dde6f5 !important; border: none !important; }
+
+        /* Inputs com classes Tailwind legados */
+        input[class*="backdrop-blur"] {
+            background: #1a2030 !important;
+            border: 1px solid #252f44 !important;
+            color: #dde6f5 !important;
+            border-radius: 6px !important;
+            padding: 7px 10px !important;
+            font-size: 0.84rem !important;
+        }
+        input[class*="backdrop-blur"]::placeholder { color: #3e4e68 !important; }
+        .border-2 { border-width: 1px !important; }
+        .border-white { border-color: #252f44 !important; }
+
+        /* Desconto / demais campos com form-group */
+        .form-group input, .form-group select {
+            background: #1a2030 !important;
+            border: 1px solid #252f44 !important;
+            color: #dde6f5 !important;
+            border-radius: 6px !important;
+        }
+
+        /* Tabela de planos */
+        table { border-collapse: collapse; width: 100%; }
+        table th { background: #1a2035 !important; color: #7eb8f7 !important; font-size: 0.78rem; padding: 8px !important; }
+        table td { color: #c8d8f0 !important; font-size: 0.8rem; padding: 7px 8px !important; border-bottom: 1px solid #1e2534 !important; }
+        table tr:nth-child(even) td { background: #171d2b !important; }
+
+        /* Botão Mostrar Planos */
+        #mostrar_plano_coletivo {
+            background: #1a3a5c !important;
+            color: #7eb8f7 !important;
+            border: 1px solid #2a5a8c !important;
+            border-radius: 6px !important;
+            padding: 10px 0 !important;
+            font-size: 0.88rem !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            width: 100% !important;
+        }
+        #mostrar_plano_coletivo:hover { background: #1f4a78 !important; }
+
+        /* Detalhes do Contrato — forçar largura total */
+        #desconto_operadora, #quantidade_parcelas {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            display: block !important;
+            box-sizing: border-box !important;
+        }
+
+        /* Erros Tailwind */
+        .text-red-500 { color: #f87171 !important; font-size: 0.72rem !important; }
+
+        /* Select2 */
+        .select2-container .select2-selection { background: #1a2030 !important; border: 1px solid #252f44 !important; border-radius: 6px !important; }
+        .select2-container .select2-selection__rendered { color: #dde6f5 !important; line-height: 34px !important; }
+        .select2-container .select2-selection--single { height: 34px !important; }
+        .select2-dropdown { background: #141824 !important; border-color: #252f44 !important; }
+        .select2-results__option { color: #c8d8f0 !important; }
+        .select2-results__option--highlighted { background: #2a5a8c !important; }
+        .select2-container .select2-selection__arrow b { border-color: #6a80a8 transparent transparent !important; }
     </style>
 </head>
 <body>
@@ -208,176 +341,143 @@
         <input type="hidden" name="desconto_corretor" id="desconto_corretor">
         <input type="hidden" name="desconto_corretora" id="desconto_corretora">
 
-        <div class="flex justify-between flex-wrap w-full">
+        <div class="cc-row">
 
-            <!-- Usuários -->
-            <div class="flex flex-col">
-                <label for="usuario_coletivo_switch" class="block mb-0.5 text-xs font-medium text-white">Corretor:</label>
-                <select name="usuario_coletivo_switch" required id="usuario_coletivo_switch" class="bg-gray-50 border text-center border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-10">
-                    <option value="">--</option>
-                    @foreach($users as $u)
-                        <option value="{{$u->id}}">{{$u->name}}</option>
-                    @endforeach
-                </select>
+        <!-- Bloco 1: Dados do Contrato -->
+        <div class="cc-bloco" style="flex:0 0 30%">
+            <div class="cc-bloco-titulo">Dados do Contrato</div>
+            <div class="cc-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="cc-field">
+                    <label for="usuario_coletivo_switch">Corretor</label>
+                    <select name="usuario_coletivo_switch" required id="usuario_coletivo_switch" style="width:100%;box-sizing:border-box">
+                        <option value="">--</option>
+                        @foreach($users as $u)
+                            <option value="{{$u->id}}">{{$u->name}}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="cc-field">
+                    <label for="administradora_coletivo">Administradora</label>
+                    <select required id="administradora_coletivo" style="width:100%;box-sizing:border-box">
+                        <option value="">--</option>
+                        @foreach($administradoras as $admin)
+                            <option value="{{$admin->id}}" {{old('administradora') == $admin->id ? 'selected' : ''}}>{{$admin->nome}}</option>
+                        @endforeach
+                    </select>
+                    <div class="erroradministradora cc-error"></div>
+                </div>
+                <div class="cc-field">
+                    <label for="tabela_origem_coletivo">Tabela Origem</label>
+                    <select required id="tabela_origem_coletivo" name="tabela_origem" style="width:100%;box-sizing:border-box">
+                        <option value="">--</option>
+                        @foreach($cidades as $cc)
+                            <option value="{{$cc->id}}" {{old('cidade_id') == $cc->id ? 'selected' : ''}}>{{$cc->nome}}</option>
+                        @endforeach
+                    </select>
+                    <div class="errorcidade cc-error"></div>
+                </div>
             </div>
-
-            <!-- Administradora -->
-            <div class="flex flex-col">
-                <label for="administradora_coletivo" class="block mb-0.5 text-xs font-medium text-white">Administradora:</label>
-                <select required id="administradora_coletivo" class="bg-gray-50 border text-center border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2">
-                    <option value="">--</option>
-                    @foreach($administradoras as $admin)
-                        <option value="{{$admin->id}}" {{old('administradora') == $admin->id ? 'selected' : ''}}>{{$admin->nome}}</option>
-                    @endforeach
-                </select>
-                <div class="erroradministradora text-red-500"></div>
-            </div>
-
-            <!-- Tabela Origem -->
-            <div class="flex flex-col">
-                <label for="tabela_origem_coletivo" class="block mb-0.5 text-xs font-medium text-white">Tabela Origem:</label>
-                <select required id="tabela_origem_coletivo" name="tabela_origem"
-                        class="bg-gray-50 border text-center border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2">
-                    <option value="">--</option>
-                    @foreach($cidades as $cc)
-                        <option value="{{$cc->id}}" {{old('cidade_id') == $cc->id ? 'selected' : ''}}>{{$cc->nome}}</option>
-                    @endforeach
-                </select>
-                <div class="errorcidade text-red-500"></div>
-            </div>
-
-
-            <!-- Titular -->
-            <div class="flex flex-col">
-                <label for="nome_coletivo" class="block mb-0.5 text-xs font-medium text-white">Titular:</label>
-                <input type="text" id="nome_coletivo" name="nome_coletivo" required class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2" placeholder="Nome">
-                <div class="errorcliente text-red-500"></div>
-            </div>
-
-            <!-- CPF -->
-            <div class="flex flex-col">
-                <label for="cpf_coletivo" class="block mb-0.5 text-xs font-medium text-white">CPF:</label>
-                <input type="text" name="cpf_coletivo" id="cpf_coletivo" required class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2" placeholder="XXX.XXXX.XXX-XX">
-                <div class="errorcpf text-red-500"></div>
-                @if($errors->has('cpf'))
-                    <p class="alert alert-danger text-red-500">{{$errors->first('cpf')}}</p>
-                @endif
-            </div>
-
-            <!-- Data Nascimento -->
-            <div class="flex flex-col">
-                <label for="data_nascimento_coletivo" class="block mb-0.5 text-xs font-medium text-white">Data Nascimento:</label>
-                <input type="date" name="data_nascimento_coletivo" value="{{old('data_nascimento_coletivo')}}" id="data_nascimento_coletivo"
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2">
-                <div class="errordatanascimento text-red-500"></div>
-            </div>
-
-            <!-- Email -->
-            <div class="flex flex-col">
-                <label for="email_coletivo" class="block mb-0.5 text-xs font-medium text-white">Email:</label>
-                <input type="email" name="email_coletivo" id="email_coletivo" placeholder="Email"
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2">
-                <div class="erroremail text-red-500"></div>
-            </div>
-
-            <!-- Celular -->
-            <div class="flex flex-col">
-                <label for="celular" class="block mb-0.5 text-xs font-medium text-white">Celular:</label>
-                <input type="text" placeholder="Celular"
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2"
-                       name="celular" id="celular">
-            </div>
-
-
-
         </div>
 
-        <!-- Segunda Linha -->
-        <div class="flex justify-between w-full my-2">
-            <div class="flex flex-col" style="flex-basis:5%;">
-                <label for="cep" class="block mb-0.5 text-xs font-medium text-white">CEP:</label>
-                <input type="text" name="cep_coletivo" id="cep_coletivo" value="{{old('cep_coletivo')}}" placeholder="CEP"
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2" value="">
+        <!-- Bloco 2: Dados do Titular -->
+        <div class="cc-bloco" style="flex:0 0 calc(70% - 14px)">
+            <div class="cc-bloco-titulo">Dados do Titular</div>
+            <div class="cc-grid" style="grid-template-columns:2fr 1fr 1fr 2fr 1fr">
+                <div class="cc-field">
+                    <label for="nome_coletivo">Titular</label>
+                    <input type="text" id="nome_coletivo" name="nome_coletivo" required placeholder="Nome completo">
+                    <div class="errorcliente cc-error"></div>
+                </div>
+                <div class="cc-field">
+                    <label for="cpf_coletivo">CPF</label>
+                    <input type="text" name="cpf_coletivo" id="cpf_coletivo" required placeholder="000.000.000-00">
+                    <div class="errorcpf cc-error"></div>
+                    @if($errors->has('cpf'))
+                        <p class="cc-error">{{$errors->first('cpf')}}</p>
+                    @endif
+                </div>
+                <div class="cc-field">
+                    <label for="data_nascimento_coletivo">Data de Nascimento</label>
+                    <input type="date" name="data_nascimento_coletivo" value="{{old('data_nascimento_coletivo')}}" id="data_nascimento_coletivo">
+                    <div class="errordatanascimento cc-error"></div>
+                </div>
+                <div class="cc-field">
+                    <label for="email_coletivo">Email</label>
+                    <input type="email" name="email_coletivo" id="email_coletivo" placeholder="email@exemplo.com">
+                    <div class="erroremail cc-error"></div>
+                </div>
+                <div class="cc-field">
+                    <label for="celular">Celular</label>
+                    <input type="text" name="celular" id="celular" placeholder="(00) 0 0000-0000">
+                </div>
             </div>
-
-            <div class="flex flex-col">
-                <label for="rua" class="block mb-0.5 text-xs font-medium text-white">Cidade:</label>
-                <input type="text" name="cidade_origem_coletivo" id="cidade_origem_coletivo"
-                       value="{{old('cidade_origem_coletivo')}}" placeholder="Cidade"
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2" value="">
-
-            </div>
-
-            <div class="flex flex-col">
-                <label for="bairro" class="block mb-0.5 text-xs font-medium text-white">Bairro:</label>
-                <input type="text" name="bairro_coletivo" id="bairro_coletivo" value="{{old('bairro_coletivo')}}" placeholder="Bairro"
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2" value="">
-
-            </div>
-
-            <div class="flex flex-col">
-                <label for="rua" class="block mb-0.5 text-xs font-medium text-white">Rua:</label>
-                <input type="text" name="rua_coletivo" id="rua_coletivo" value="{{old('rua_coletivo')}}" placeholder="Logradouro(Rua)"
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2" value="">
-
-            </div>
-
-            <div class="flex flex-col">
-                <label for="bairro" class="block mb-0.5 text-xs font-medium text-white">Complemento:</label>
-                <input type="text" name="complemento_coletivo" id="complemento_coletivo" value="{{old('complemento_coletivo')}}"
-                       placeholder="Complemento(Opcional)"
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2" value="">
-
-            </div>
-
-
-            <div class="flex flex-col">
-                <label for="uf" class="block mb-0.5 text-xs font-medium text-white">UF:</label>
-                <input type="text" name="uf_coletivo" id="uf_coletivo" value="{{old('uf_coletivo')}}" placeholder="UF"
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2" value="">
-            </div>
-
-            <div class="flex flex-col">
-                <label for="codigo_externo" class="block mb-0.5 text-xs font-medium text-white">Codigo Externo:</label>
-                <input type="text" name="codigo_externo_coletivo" required id="codigo_externo_coletivo" value="{{old('codigo_externo_coletivo')}}"
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2" placeholder="COD.">
-            </div>
-
-
-
-            <!-- Data Cadastro (Plano) -->
-            <div class="flex flex-col">
-                <label for="data_cadastro_coletivo" class="block mb-0.5 text-xs font-medium text-white">Data Cadastro (Plano):</label>
-                <input type="date" name="data_cadastro_coletivo" required id="data_cadastro_coletivo" value="{{old('data_cadastro_coletivo')}}"
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2">
-            </div>
-
-
-
         </div>
-        <!-- Fim Segunda Linha -->
 
-        <div class="flex w-full">
+        </div><!-- /flex row blocos 1+2 -->
 
-            <div class="form-group mr-3">
-                <span for="desconto_operadora" class="block mb-0.5 text-xs font-medium text-white">Desconto Operadora:</span>
-                <input type="number" name="desconto_operadora" id="desconto_operadora" value=""
-                       class="w-full rounded-lg placeholder:text-white text-white p-1 bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] text-xs border-white border-2" placeholder="Desconto Operadora">
+        <div class="cc-row">
+
+        <!-- Bloco 3: Endereço e Dados do Plano -->
+        <div class="cc-bloco" style="flex:0 0 75%">
+            <div class="cc-bloco-titulo">Endereço e Plano</div>
+            <div class="cc-grid" style="grid-template-columns:0.6fr 1fr 1fr 1.4fr 1fr 0.4fr 0.9fr 1fr;margin-top:18px">
+                <div class="cc-field">
+                    <label for="cep_coletivo">CEP</label>
+                    <input type="text" name="cep_coletivo" id="cep_coletivo" value="{{old('cep_coletivo')}}" placeholder="00000-000">
+                </div>
+                <div class="cc-field">
+                    <label for="cidade_origem_coletivo">Cidade</label>
+                    <input type="text" name="cidade_origem_coletivo" id="cidade_origem_coletivo" value="{{old('cidade_origem_coletivo')}}" placeholder="Cidade">
+                </div>
+                <div class="cc-field">
+                    <label for="bairro_coletivo">Bairro</label>
+                    <input type="text" name="bairro_coletivo" id="bairro_coletivo" value="{{old('bairro_coletivo')}}" placeholder="Bairro">
+                </div>
+                <div class="cc-field">
+                    <label for="rua_coletivo">Rua</label>
+                    <input type="text" name="rua_coletivo" id="rua_coletivo" value="{{old('rua_coletivo')}}" placeholder="Logradouro">
+                </div>
+                <div class="cc-field">
+                    <label for="complemento_coletivo">Complemento</label>
+                    <input type="text" name="complemento_coletivo" id="complemento_coletivo" value="{{old('complemento_coletivo')}}" placeholder="Opcional">
+                </div>
+                <div class="cc-field">
+                    <label for="uf_coletivo">UF</label>
+                    <input type="text" name="uf_coletivo" id="uf_coletivo" value="{{old('uf_coletivo')}}" placeholder="UF" style="max-width:80px">
+                </div>
+                <div class="cc-field">
+                    <label for="codigo_externo_coletivo">Código Externo</label>
+                    <input type="text" name="codigo_externo_coletivo" required id="codigo_externo_coletivo" value="{{old('codigo_externo_coletivo')}}" placeholder="COD.">
+                </div>
+                <div class="cc-field">
+                    <label for="data_cadastro_coletivo">Data Cadastro (Plano)</label>
+                    <input type="date" name="data_cadastro_coletivo" required id="data_cadastro_coletivo" value="{{old('data_cadastro_coletivo')}}">
+                </div>
             </div>
+        </div>
 
-            <div class="form-group mr-3">
-                <span for="quantidade_parcelas" class="block mb-0.5 text-xs font-medium text-white">Qte Parcelas do desconto:</span>
-                <select name="quantidade_parcelas" id="quantidade_parcelas"
-                        class="w-full rounded-lg placeholder:text-white p-1 bg-[rgba(254,254,254,0.18)] text-black backdrop-blur-[15px] text-xs border-white border-2">
-                    <option class="text-center" value="" style="color:white;">--</option>
-                    <option value="1" style="color:black;">1</option>
-                    <option value="2" style="color:black;">2</option>
-                    <option value="3" style="color:black;">3</option>
-                    <option value="4" style="color:black;">4</option>
-                    <option value="5" style="color:black;">5</option>
-                    <option value="6" style="color:black;">6</option>
-                </select>
-            </div>
+        <!-- Bloco 4: Detalhes do Contrato -->
+        <div class="cc-bloco" style="flex:1">
+            <div class="cc-bloco-titulo">Detalhes do Contrato</div>
+            <div class="cc-grid" style="grid-template-columns:1fr 1fr;align-items:end;gap:10px 14px">
+
+                <div class="cc-field">
+                    <label for="desconto_operadora">Desconto Operadora</label>
+                    <input type="number" name="desconto_operadora" id="desconto_operadora" value="" placeholder="0" style="width:100%;box-sizing:border-box">
+                </div>
+
+                <div class="cc-field">
+                    <label for="quantidade_parcelas">Qte Parcelas do Desconto</label>
+                    <select name="quantidade_parcelas" id="quantidade_parcelas" style="width:100%;box-sizing:border-box;background:#1a2030;border:1px solid #252f44;border-radius:6px;color:#dde6f5;font-size:0.84rem;padding:7px 10px;outline:none">
+                        <option value="">--</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                    </select>
+                </div>
 
 
 
@@ -387,59 +487,56 @@
 
 
 
-            <div x-data="{ coparticipacao: '{{ old('coparticipacao_coletivo') ? old('coparticipacao_coletivo') : '' }}' }" class="flex mr-3 ">
-                <div class="flex flex-col">
-                    <span class="text-white text-xs mb-1">Coparticipação:</span>
-                    <div class="flex space-x-2">
-                        <label :class="{'bg-purple-600 border-white': coparticipacao === 'sim'}" for="coparticipacao_radio_sim" class="cursor-pointer border border-gray-300 rounded-lg px-3 py-1.5 text-white">
+
+                <div class="cc-field">
+                    <label>Coparticipação</label>
+                    <div x-data="{ coparticipacao: '{{ old('coparticipacao_coletivo') ? old('coparticipacao_coletivo') : '' }}' }" class="flex space-x-2" style="padding-top:2px">
+                        <label :class="{'bg-purple-600 border-white': coparticipacao === 'sim'}" for="coparticipacao_radio_sim" class="cursor-pointer border border-gray-300 rounded-lg px-3 py-1.5 text-white" style="font-size:0.8rem">
                             <input type="radio" name="coparticipacao_coletivo" id="coparticipacao_radio_sim" value="sim" x-model="coparticipacao" class="sr-only">
-                            <span>Sim</span>
+                            Sim
                         </label>
-                        <label :class="{'bg-purple-600 border-white': coparticipacao === 'nao'}" for="coparticipacao_radio_nao" class="cursor-pointer border border-gray-300 rounded-lg px-3 py-1.5 text-white">
+                        <label :class="{'bg-purple-600 border-white': coparticipacao === 'nao'}" for="coparticipacao_radio_nao" class="cursor-pointer border border-gray-300 rounded-lg px-3 py-1.5 text-white" style="font-size:0.8rem">
                             <input type="radio" name="coparticipacao_coletivo" id="coparticipacao_radio_nao" value="nao" x-model="coparticipacao" class="sr-only">
-                            <span>Não</span>
+                            Não
                         </label>
                     </div>
                 </div>
-            </div>
 
-            <div x-data="{ odonto: '{{ old('odonto_coletivo') ? old('odonto_coletivo') : '' }}' }" class="flex">
-                <div class="flex flex-col">
-                    <span for="odonto" class="text-white" style="font-size:0.78em;">Odonto:</span>
-                    <div class="flex space-x-2">
-                        <label :class="{'bg-purple-600 border-white': odonto === 'sim'}" for="odonto_radio_sim" class="cursor-pointer border border-gray-300 rounded-lg px-3 py-1.5 text-white">
+                <div class="cc-field">
+                    <label>Odonto</label>
+                    <div x-data="{ odonto: '{{ old('odonto_coletivo') ? old('odonto_coletivo') : '' }}' }" class="flex space-x-2" style="padding-top:2px">
+                        <label :class="{'bg-purple-600 border-white': odonto === 'sim'}" for="odonto_radio_sim" class="cursor-pointer border border-gray-300 rounded-lg px-3 py-1.5 text-white" style="font-size:0.8rem">
                             <input type="radio" name="odonto_coletivo" id="odonto_radio_sim" value="sim" x-model="odonto" class="sr-only">
-                            <span>Sim</span>
+                            Sim
                         </label>
-                        <label :class="{'bg-purple-600 border-white': odonto === 'nao'}" for="odonto_radio_nao" class="cursor-pointer border border-gray-300 rounded-lg px-3 py-1.5 text-white">
+                        <label :class="{'bg-purple-600 border-white': odonto === 'nao'}" for="odonto_radio_nao" class="cursor-pointer border border-gray-300 rounded-lg px-3 py-1.5 text-white" style="font-size:0.8rem">
                             <input type="radio" name="odonto_coletivo" id="odonto_radio_nao" value="nao" x-model="odonto" class="sr-only">
-                            <span>Não</span>
+                            Não
                         </label>
                     </div>
                 </div>
+
+
             </div>
         </div>
+
+        </div><!-- /flex row blocos 3+4 -->
 
         <div class="flex flex-col">
-
             <div>
                 <input type="checkbox" id="dependente_coletivo" name="dependente_coletivo"><span class="text-white">Responsável</span>
             </div>
-
             <div class="hidden" id="container_responsavel_coletivo">
-
                 <div class="flex">
                     <div style="flex-basis:30%;margin-right:1%;display:flex;">
-
                         <span style="flex-basis:30%;" for="codigo_externo" class="text-white">Responsável:</span>
-                        <input style="flex-basis:70%;" type="text" name="responsavel_financeiro_coletivo_cadastrar_nome" id="responsavel_financeiro_coletivo_cadastrar_nome" value="{{old('responsavel_financeiro_coletivo_cadastrar_nome')}}" class="form-control  form-control-sm" placeholder="Nome Responsavel">
+                        <input style="flex-basis:70%;" type="text" name="responsavel_financeiro_coletivo_cadastrar_nome" id="responsavel_financeiro_coletivo_cadastrar_nome" value="{{old('responsavel_financeiro_coletivo_cadastrar_nome')}}" class="form-control form-control-sm" placeholder="Nome Responsavel">
                     </div>
                     <div style="flex-basis:70%;display:flex;">
                         <span style="flex-basis:17%;" for="codigo_externo" class="text-white">CPF Responsável:</span>
-                        <input style="flex-basis:30%;" type="text" name="responsavel_financeiro_coletivo_cadastrar_cpf" id="responsavel_financeiro_coletivo_cadastrar_cpf" value="{{old('responsavel_financeiro_coletivo_cadastrar_cpf')}}" class="form-control  form-control-sm" placeholder="CPF Responsavel">
+                        <input style="flex-basis:30%;" type="text" name="responsavel_financeiro_coletivo_cadastrar_cpf" id="responsavel_financeiro_coletivo_cadastrar_cpf" value="{{old('responsavel_financeiro_coletivo_cadastrar_cpf')}}" class="form-control form-control-sm" placeholder="CPF Responsavel">
                     </div>
                 </div>
-
             </div>
         </div>
 
@@ -622,16 +719,9 @@
     $(function(){
 
 
-        $('#usuario_coletivo_switch').select2({
-            width: '180px'
-        });
-
-        $('#administradora_coletivo').select2({
-            width: '120px'
-        });
-        $('#tabela_origem_coletivo').select2({
-            width: '180px'
-        });
+        $('#usuario_coletivo_switch').select2({ width: '100%' });
+        $('#administradora_coletivo').select2({ width: '100%' });
+        $('#tabela_origem_coletivo').select2({ width: '100%' });
 
 
 
@@ -1065,3 +1155,5 @@
 
 </body>
 </html>
+
+

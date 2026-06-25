@@ -94,6 +94,7 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/financeiro/baixaDaData',[FinanceiroController::class,'baixaDaData'])->name('financeiro.baixa.data');
     Route::post('/financeiro/individual/baixaDaData',[FinanceiroController::class,'baixaDaDataIndividual'])->name('financeiro.baixa.individual');
+    Route::post('/financeiro/individual/atualizar-comissao',[FinanceiroController::class,'atualizarComissaoParcelaIndividual'])->name('financeiro.individual.atualizar.comissao');
 
     Route::post('/financeiro/empresarial/baixaDaDataEmpresarial',[FinanceiroController::class,'baixaDaDataEmpresarial'])->name('financeiro.baixa.data.empresarial');
     Route::post('/financeiro/empresarial/updateComissaoLancada',[FinanceiroController::class,'updateComissaoLancadaEmpresarial'])->name('financeiro.empresarial.update.comissao.lancada');

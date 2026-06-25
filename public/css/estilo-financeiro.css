@@ -1005,11 +1005,11 @@ input.fim-date-action::-webkit-calendar-picker-indicator {
 input.fim-date-action:hover::-webkit-calendar-picker-indicator { opacity: 1; }
 
 .desfazer_individual {
-    width: 15px !important; height: 15px !important;
-    color: #243a56 !important;
+    width: 18px !important; height: 18px !important;
+    color: #f97316 !important;
     cursor: pointer; transition: color 0.15s;
 }
-.desfazer_individual:hover { color: #7ab3e0 !important; }
+.desfazer_individual:hover { color: #fb923c !important; }
 /* ===================== FIM MODAL INDIVIDUAL ===================== */
 
 /* Fix: contagem nos badges de status do coletivo (JS injeta <span class="flex">) */

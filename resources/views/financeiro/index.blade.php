@@ -36,6 +36,7 @@
             var urlBaixaColetivo        = "{{route('financeiro.baixa.data')}}";
 
             var urlBaixaIndividual = "{{route('financeiro.baixa.individual')}}";
+            var urlAtualizarComissaoIndividual = "{{route('financeiro.individual.atualizar.comissao')}}";
 
             var desfazerColetivo        = "{{route('desfazer.tarefa.coletivo')}}";
             var desfazerIndividual        = "{{route('desfazer.tarefa.individual')}}";

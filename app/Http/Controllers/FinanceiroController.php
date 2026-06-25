@@ -2029,6 +2029,14 @@ class FinanceiroController extends Controller
         FROM tabelas
         WHERE faixa_etaria_id IN($chaves) AND tabela_origens_id =  $cidade AND administradora_id = $administradora AND odonto = $odonto AND coparticipacao = $coparticipacao");
 
+        if (empty($dados)) {
+            return view("financeiro.acomodacao",[
+                "dados" => [],
+                "card_inicial" => null,
+                "quantidade" => 0
+            ]);
+        }
+
         return view("financeiro.acomodacao",[
             "dados" => $dados,
             "card_inicial" => $dados[0]->card,
@@ -3240,8 +3248,10 @@ class FinanceiroController extends Controller
             ComissoesCorretoresLancadas::where('comissoes_id', $comissao->id)
                 ->where('parcela', '>=', $parcela_numero)
                 ->update([
-                    'status_financeiro' => 0,
-                    'data_baixa' => null,
+                    'status_financeiro'  => 0,
+                    'status_gerente'     => 0,
+                    'data_baixa'         => null,
+                    'data_baixa_gerente' => null,
                 ]);
         }
 
@@ -3359,12 +3369,51 @@ class FinanceiroController extends Controller
 
         switch($financeiro_id) {
 
+            case 1:
+                $contrato->financeiro_id = 3;
+                if($comissoes) {
+                    $parcela->status_financeiro  = 1;
+                    $parcela->status_gerente     = 1;
+                    $parcela->data_baixa         = $data_baixa;
+                    $parcela->data_baixa_gerente = $data_baixa;
+                    $parcela->atual              = 1;
+                    $parcela->manualmente        = 0;
+                    $parcela->save();
+                }
+                $contrato->save();
+                return response()->json([
+                    "status" => "Pag. 1º Parcela",
+                    "baixa"  => $data_baixa,
+                ]);
+            break;
+
+            case 4:
+                $contrato->financeiro_id = 5;
+                if($comissoes) {
+                    $parcela->status_financeiro  = 1;
+                    $parcela->status_gerente     = 1;
+                    $parcela->data_baixa         = $data_baixa;
+                    $parcela->data_baixa_gerente = $data_baixa;
+                    $parcela->atual              = 1;
+                    $parcela->manualmente        = 0;
+                    $parcela->save();
+                }
+                $contrato->save();
+                return response()->json([
+                    "status" => "Pag. 2º Parcela",
+                    "baixa"  => $data_baixa,
+                ]);
+            break;
+
             case 3:
                 $contrato->financeiro_id = 5;
                 if($comissoes) {
-                    $parcela->status_financeiro = 1;
-                    $parcela->data_baixa = $data_baixa;
-                    $parcela->atual = 1;
+                    $parcela->status_financeiro  = 1;
+                    $parcela->status_gerente     = 1;
+                    $parcela->data_baixa         = $data_baixa;
+                    $parcela->data_baixa_gerente = $data_baixa;
+                    $parcela->atual              = 1;
+                    $parcela->manualmente        = 0;
                     $parcela->save();
                 }
                 $contrato->save();
@@ -3377,9 +3426,12 @@ class FinanceiroController extends Controller
             case 5:
                 $contrato->financeiro_id = 6;
                 if($comissoes) {
-                    $parcela->status_financeiro = 1;
-                    $parcela->data_baixa = $data_baixa;
-                    $parcela->atual = 1;
+                    $parcela->status_financeiro  = 1;
+                    $parcela->status_gerente     = 1;
+                    $parcela->data_baixa         = $data_baixa;
+                    $parcela->data_baixa_gerente = $data_baixa;
+                    $parcela->atual              = 1;
+                    $parcela->manualmente        = 0;
                     $parcela->save();
                 }
                 $contrato->save();
@@ -3392,9 +3444,12 @@ class FinanceiroController extends Controller
             case 6:
                 $contrato->financeiro_id = 7;
                 if($comissoes) {
-                    $parcela->status_financeiro = 1;
-                    $parcela->data_baixa = $data_baixa;
-                    $parcela->atual = 1;
+                    $parcela->status_financeiro  = 1;
+                    $parcela->status_gerente     = 1;
+                    $parcela->data_baixa         = $data_baixa;
+                    $parcela->data_baixa_gerente = $data_baixa;
+                    $parcela->atual              = 1;
+                    $parcela->manualmente        = 0;
                     $parcela->save();
                 }
                 $contrato->save();
@@ -3407,9 +3462,12 @@ class FinanceiroController extends Controller
             case 7:
                 $contrato->financeiro_id = 8;
                 if($comissoes) {
-                    $parcela->status_financeiro = 1;
-                    $parcela->data_baixa = $data_baixa;
-                    $parcela->atual = 1;
+                    $parcela->status_financeiro  = 1;
+                    $parcela->status_gerente     = 1;
+                    $parcela->data_baixa         = $data_baixa;
+                    $parcela->data_baixa_gerente = $data_baixa;
+                    $parcela->atual              = 1;
+                    $parcela->manualmente        = 0;
                     $parcela->save();
                 }
                 $contrato->save();
@@ -3422,9 +3480,12 @@ class FinanceiroController extends Controller
             case 8:
                 $contrato->financeiro_id = 9;
                 if($comissoes) {
-                    $parcela->status_financeiro = 1;
-                    $parcela->data_baixa = $data_baixa;
-                    $parcela->atual = 1;
+                    $parcela->status_financeiro  = 1;
+                    $parcela->status_gerente     = 1;
+                    $parcela->data_baixa         = $data_baixa;
+                    $parcela->data_baixa_gerente = $data_baixa;
+                    $parcela->atual              = 1;
+                    $parcela->manualmente        = 0;
                     $parcela->save();
                 }
                 $contrato->save();
@@ -3437,9 +3498,12 @@ class FinanceiroController extends Controller
             case 9:
                 $contrato->financeiro_id = 11;
                 if($comissoes) {
-                    $parcela->status_financeiro = 1;
-                    $parcela->data_baixa = $data_baixa;
-                    $parcela->atual = 1;
+                    $parcela->status_financeiro  = 1;
+                    $parcela->status_gerente     = 1;
+                    $parcela->data_baixa         = $data_baixa;
+                    $parcela->data_baixa_gerente = $data_baixa;
+                    $parcela->atual              = 1;
+                    $parcela->manualmente        = 0;
                     $parcela->save();
                 }
                 $contrato->save();
@@ -3449,6 +3513,15 @@ class FinanceiroController extends Controller
                 ];
             break;
         }
+    }
+
+    public function atualizarComissaoParcelaIndividual(Request $request)
+    {
+        $parcela = ComissoesCorretoresLancadas::findOrFail($request->id);
+        $valor   = (float) str_replace(['.', ','], ['', '.'], $request->valor ?? '0');
+        $parcela->valor = $valor;
+        $parcela->save();
+        return response()->json(['success' => true, 'valor' => number_format($valor, 2, ',', '.')]);
     }
 
 

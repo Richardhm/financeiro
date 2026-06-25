@@ -987,7 +987,7 @@ $("body").on('click','.desfazer_individual',function(){
                         // Substituímos pelo input[type="date"]
                         tdDataBaixa.html(`
                             <input type="date"
-                                class="bg-gray-100 text-gray-800 p-1 text-sm rounded-md date-picker"
+                                class="fim-date-action next_individual date-picker"
                                 data-id="${trParcela}"
                                 min="1900-01-01"
                                 max="${new Date().toISOString().split('T')[0]}">
@@ -1007,6 +1007,33 @@ $("body").on('click','.desfazer_individual',function(){
 });
 
 
+
+$("body").on('click', '.salvar-comissao-individual', function () {
+    var btn   = $(this);
+    var id    = btn.data('id');
+    var input = btn.closest('div').find('.valor-comissao-input');
+    var valor = input.val();
+    $.ajax({
+        url: urlAtualizarComissaoIndividual,
+        method: 'POST',
+        data: { id: id, valor: valor },
+        success: function (res) {
+            if (res.success) {
+                input.val(res.valor);
+                btn.text('✓').css('background', '#1a3a22').css('border-color', '#27ae60').css('color', '#2ecc71');
+                setTimeout(function () {
+                    btn.text('Salvar').css('background', '#1a3a5c').css('border-color', '#2a5a8c').css('color', '#7eb8f7');
+                }, 2000);
+            }
+        },
+        error: function () {
+            btn.text('Erro').css('background', '#3a1a1a').css('border-color', '#c0392b').css('color', '#e74c3c');
+            setTimeout(function () {
+                btn.text('Salvar').css('background', '#1a3a5c').css('border-color', '#2a5a8c').css('color', '#7eb8f7');
+            }, 2000);
+        }
+    });
+});
 
 $("body").on('click', '[id^="desfazer_"]', function(){
     let id = $(this).attr('id');

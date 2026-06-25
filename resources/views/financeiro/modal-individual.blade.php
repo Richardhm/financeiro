@@ -216,10 +216,11 @@
                     <th>#</th>
                     <th>Contrato</th>
                     <th>Vencimento</th>
-                    <th>Valor</th>
+                    <th>Valor Pago</th>
                     <th>Baixa</th>
                     <th>Dias</th>
                     <th>Ação</th>
+                    <th>Comissão</th>
                     <th>Desfazer</th>
                 </tr>
             </thead>
@@ -277,8 +278,25 @@
                             </button>
                         @endif
                     </td>
-                    <td style="text-align:center">
-                        <svg xmlns="http://www.w3.org/2000/svg" data-id="{{ $cr->id }}" viewBox="0 0 24 24" fill="currentColor" class="desfazer_individual">
+                    <td>
+                        <div style="display:flex;align-items:center;gap:3px">
+                            <input type="text"
+                                   class="valor-comissao-input"
+                                   data-id="{{ $cr->id }}"
+                                   value="{{ number_format($cr->valor, 2, ',', '.') }}"
+                                   style="width:72px;padding:3px 5px;background:#252a3a;border:1px solid #2e3550;border-radius:4px;color:#e0e6f0;text-align:right;font-size:0.78rem;box-sizing:border-box">
+                            <button type="button"
+                                    class="salvar-comissao-individual"
+                                    data-id="{{ $cr->id }}"
+                                    title="Salvar comissão"
+                                    style="background:#1a3a5c;border:1px solid #2a5a8c;border-radius:4px;padding:2px 6px;color:#7eb8f7;font-size:0.72rem;cursor:pointer;white-space:nowrap">
+                                Salvar
+                            </button>
+                        </div>
+                    </td>
+                    <td style="text-align:center;vertical-align:middle">
+                        <svg xmlns="http://www.w3.org/2000/svg" data-id="{{ $cr->id }}" viewBox="0 0 24 24" fill="currentColor" class="desfazer_individual"
+                             style="display:inline-block;vertical-align:middle">
                             <path fill-rule="evenodd" d="M9.53 2.47a.75.75 0 0 1 0 1.06L4.81 8.25H15a6.75 6.75 0 0 1 0 13.5h-3a.75.75 0 0 1 0-1.5h3a5.25 5.25 0 1 0 0-10.5H4.81l4.72 4.72a.75.75 0 1 1-1.06 1.06l-6-6a.75.75 0 0 1 0-1.06l6-6a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
                         </svg>
                     </td>

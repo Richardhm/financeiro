@@ -92,21 +92,17 @@
     </div>
     <div class="form-group">
         <label>CPF <span class="req">*</span></label>
-        <input type="text" name="cpf" value="{{ old('cpf') }}" required placeholder="000.000.000-00" maxlength="14">
+        <input type="text" id="cpf" name="cpf" value="{{ old('cpf') }}" required placeholder="000.000.000-00" maxlength="14">
     </div>
 </div>
-<div class="form-row cols-4">
+<div class="form-row cols-3">
     <div class="form-group">
         <label>Data de Nascimento <span class="req">*</span></label>
         <input type="date" name="data_nascimento" value="{{ old('data_nascimento') }}" required>
     </div>
     <div class="form-group">
         <label>Celular <span class="req">*</span></label>
-        <input type="text" name="celular" value="{{ old('celular') }}" required placeholder="(00) 00000-0000">
-    </div>
-    <div class="form-group">
-        <label>Telefone</label>
-        <input type="text" name="telefone" value="{{ old('telefone') }}" placeholder="opcional">
+        <input type="text" id="celular" name="celular" value="{{ old('celular') }}" required placeholder="(00) 0 0000-0000" maxlength="16">
     </div>
     <div class="form-group">
         <label>E-mail</label>
@@ -120,15 +116,15 @@
 <div class="form-row cols-4">
     <div class="form-group">
         <label>CEP</label>
-        <input type="text" name="cep" value="{{ old('cep') }}" placeholder="00000-000" maxlength="9">
+        <input type="text" id="cep" name="cep" value="{{ old('cep') }}" placeholder="00000-000" maxlength="9">
     </div>
     <div class="form-group" style="grid-column:span 2">
         <label>Rua / Logradouro</label>
-        <input type="text" name="rua" value="{{ old('rua') }}">
+        <input type="text" id="rua" name="rua" value="{{ old('rua') }}">
     </div>
     <div class="form-group">
         <label>Bairro</label>
-        <input type="text" name="bairro" value="{{ old('bairro') }}">
+        <input type="text" id="bairro" name="bairro" value="{{ old('bairro') }}">
     </div>
 </div>
 <div class="form-row cols-4">
@@ -138,11 +134,11 @@
     </div>
     <div class="form-group">
         <label>Cidade</label>
-        <input type="text" name="cidade" value="{{ old('cidade') }}">
+        <input type="text" id="cidade" name="cidade" value="{{ old('cidade') }}">
     </div>
     <div class="form-group">
         <label>UF</label>
-        <input type="text" name="uf" value="{{ old('uf') }}" maxlength="2" placeholder="GO" style="text-transform:uppercase">
+        <input type="text" id="uf" name="uf" value="{{ old('uf') }}" maxlength="2" placeholder="GO" style="text-transform:uppercase">
     </div>
 </div>
 
@@ -191,7 +187,7 @@
     </div>
     <div class="form-group">
         <label>Valor de Adesão (R$)</label>
-        <input type="text" name="valor_adesao" value="{{ old('valor_adesao', '0,00') }}" placeholder="0,00">
+        <input type="text" id="valor_adesao" name="valor_adesao" value="{{ old('valor_adesao', '0,00') }}" placeholder="0,00">
         <p class="hint">Valor pago na 1ª parcela (adesão)</p>
     </div>
 </div>
@@ -253,8 +249,71 @@
 </div>
 </div>
 
-@section('js')
+@section('scripts')
 <script>
+(function () {
+    /* ── Máscara celular (XX) X XXXX-XXXX ── */
+    var celularFld = document.getElementById('celular');
+    celularFld.addEventListener('input', function () {
+        var v = this.value.replace(/\D/g, '').slice(0, 11);
+        if (v.length > 10) {
+            v = '(' + v.slice(0,2) + ') ' + v.slice(2,3) + ' ' + v.slice(3,7) + '-' + v.slice(7);
+        } else if (v.length > 6) {
+            v = '(' + v.slice(0,2) + ') ' + v.slice(2,6) + '-' + v.slice(6);
+        } else if (v.length > 2) {
+            v = '(' + v.slice(0,2) + ') ' + v.slice(2);
+        } else if (v.length > 0) {
+            v = '(' + v;
+        }
+        this.value = v;
+    });
+
+    /* ── Máscara CPF 000.000.000-00 ── */
+    var cpfFld = document.getElementById('cpf');
+    cpfFld.addEventListener('input', function () {
+        var v = this.value.replace(/\D/g, '').slice(0, 11);
+        if (v.length > 9)      v = v.slice(0,3) + '.' + v.slice(3,6) + '.' + v.slice(6,9) + '-' + v.slice(9);
+        else if (v.length > 6) v = v.slice(0,3) + '.' + v.slice(3,6) + '.' + v.slice(6);
+        else if (v.length > 3) v = v.slice(0,3) + '.' + v.slice(3);
+        this.value = v;
+    });
+
+    /* ── Máscara moeda (Valor do Plano / Valor de Adesão) ── */
+    function mascaraMoeda(el) {
+        el.addEventListener('input', function () {
+            var raw = this.value.replace(/\D/g, '');
+            if (!raw) { this.value = ''; return; }
+            var cents = parseInt(raw, 10);
+            var reais = Math.floor(cents / 100);
+            var dec   = cents % 100;
+            this.value = reais.toLocaleString('pt-BR') + ',' + ('0' + dec).slice(-2);
+        });
+    }
+    mascaraMoeda(document.getElementById('valor_plano'));
+    mascaraMoeda(document.getElementById('valor_adesao'));
+
+    /* ── CEP → ViaCEP autocomplete ── */
+    var cepFld = document.getElementById('cep');
+    cepFld.addEventListener('input', function () {
+        var raw = this.value.replace(/\D/g, '');
+        if (raw.length > 5) this.value = raw.slice(0,5) + '-' + raw.slice(5,8);
+    });
+    cepFld.addEventListener('blur', function () {
+        var raw = this.value.replace(/\D/g, '');
+        if (raw.length !== 8) return;
+        fetch('https://viacep.com.br/ws/' + raw + '/json/')
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.erro) return;
+                document.getElementById('rua').value    = d.logradouro || '';
+                document.getElementById('bairro').value = d.bairro     || '';
+                document.getElementById('cidade').value = d.localidade || '';
+                document.getElementById('uf').value     = d.uf         || '';
+            })
+            .catch(function () {});
+    });
+})();
+
 (function () {
     var fldAdesao  = document.getElementById('data_adesao');
     var fldBoleto  = document.getElementById('data_boleto');

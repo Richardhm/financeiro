@@ -22,6 +22,8 @@ class CadastrarIndividualController extends Controller
         $users       = User::where('ativo', 1)
             ->where('corretora_id', $corretora_id)
             ->where('id', '!=', 1)
+            ->whereNotNull('name')
+            ->where('name', '!=', '')
             ->orderBy('name')
             ->get();
         $acomodacoes = Acomodacao::orderBy('nome')->get();
@@ -40,7 +42,7 @@ class CadastrarIndividualController extends Controller
             'celular'          => 'required|string',
             'tabela_origem_id' => 'required|exists:tabela_origens,id',
             'acomodacao_id'    => 'required|exists:acomodacoes,id',
-            'valor_plano'      => 'required|numeric|min:0',
+            'valor_plano'      => 'required|string',
             'data_adesao'      => 'required|date',
             'data_boleto'      => 'required|date',
             'qtd_parcelas'     => 'required|integer|min:1|max:24',
@@ -118,7 +120,7 @@ class CadastrarIndividualController extends Controller
                 ->withInput();
         }
 
-        return redirect(route('financeiro.index') . '?ac=individual')
+        return redirect(route('financeiro.index'))
             ->with('success', 'Contrato individual cadastrado com sucesso!');
     }
 
