@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class ComissaoCorretorDefault extends Model
 {
-    // Usa a conexão tenant dinâmica
 
     protected $table = 'comissoes_corretores_default';
 

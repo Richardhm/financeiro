@@ -186,6 +186,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/comissao-corretora', [FolhaAmerica::class, 'indexComissaoCorretora'])->name('comissao-corretora');
         Route::post('/comissao-corretora', [FolhaAmerica::class, 'salvarComissaoCorretora'])->name('comissao-corretora.salvar');
         Route::delete('/comissao-corretora/{id}', [FolhaAmerica::class, 'deletarComissaoCorretora'])->name('comissao-corretora.deletar');
+
+        Route::get('/template-comissoes', [FolhaAmerica::class, 'indexTemplateComissoes'])->name('template-comissoes');
+        Route::post('/template-comissoes', [FolhaAmerica::class, 'salvarTemplateComissoes'])->name('template-comissoes.salvar');
+        Route::delete('/template-comissoes', [FolhaAmerica::class, 'deletarTemplateComissoes'])->name('template-comissoes.deletar');
         Route::post('/comissao-corretora/recalcular', [FolhaAmerica::class, 'recalcularValorCorretora'])->name('comissao-corretora.recalcular');
 
         Route::get('/parceiros/pagamentos', [FolhaAmerica::class, 'pagamentosParceiros'])->name('parceiros.pagamentos');

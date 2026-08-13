@@ -267,6 +267,14 @@
             <input type="number" step="0.01" min="0" name="desconto_corretor" id="f-desconto-corretor" value="0">
         </div>
     </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#e0e6f0;">
+                <input type="checkbox" name="desconto_comissao_665" value="1" style="width:auto;">
+                Descontar 6,65% da comissão do vendedor
+            </label>
+        </div>
+    </div>
 
     {{-- BENEFICIÁRIOS --}}
     <p class="section-title">Beneficiários (Usuários do Plano) <span class="tag-auto">auto</span></p>

@@ -440,7 +440,10 @@
 
                         <td>
                             @if($cr->status_financeiro == 0)
-                                <input type="date" data-id="{{$id}}" class="bg-gray-100 text-gray-800 p-1 text-sm rounded-md next_empresarial">
+                                <input type="date" data-id="{{$id}}"
+                                       min="{{ date('Y-m-d', strtotime('1900-01-01')) }}"
+                                       max="{{ date('Y-m-d') }}"
+                                       class="fim-date-action next_empresarial date-picker">
                             @else
                                 <button type="button" class="em_analise text-center text-white flex justify-center cursor-not-allowed bg-green-700 hover:bg-green-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-3 py-1 me-2 mb-2 dark:bg-green-600 dark:hover:bg-green-700 focus:outline-none dark:focus:ring-blue-800 w-11/12">
                                     <svg class="w-6 h-6 text-white dark:text-white text-center mx-auto" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">

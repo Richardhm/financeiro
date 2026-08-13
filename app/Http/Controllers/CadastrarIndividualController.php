@@ -11,6 +11,7 @@ use App\Models\ComissoesCorretoresLancadas;
 use App\Models\Contrato;
 use App\Models\TabelaOrigens;
 use App\Models\User;
+use App\Services\PjComissaoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -43,6 +44,7 @@ class CadastrarIndividualController extends Controller
             'tabela_origem_id' => 'required|exists:tabela_origens,id',
             'acomodacao_id'    => 'required|exists:acomodacoes,id',
             'valor_plano'      => 'required|string',
+            'data_cadastro'    => 'required|date',
             'data_adesao'      => 'required|date',
             'data_boleto'      => 'required|date',
             'qtd_parcelas'     => 'required|integer|min:1|max:24',
@@ -92,6 +94,7 @@ class CadastrarIndividualController extends Controller
             $contrato->data_baixa        = $request->data_baixa ?: null;
             $contrato->valor_adesao      = $valor_adesao;
             $contrato->valor_plano       = $valor_plano;
+            $contrato->created_at        = $request->data_cadastro;
             $contrato->save();
 
             $comissao = new Comissoes();
@@ -101,18 +104,28 @@ class CadastrarIndividualController extends Controller
             $comissao->plano_id          = 1;
             $comissao->administradora_id = 4;
             $comissao->tabela_origens_id = $request->tabela_origem_id;
-            $comissao->data              = now()->format('Y-m-d');
+            $comissao->data              = $request->data_cadastro;
             $comissao->save();
 
-            $this->lancarParcelas(
-                $comissao, $user, $corretora_id,
-                $valor_plano, $valor_adesao,
-                $request->data_adesao,
-                $request->data_boleto,
-                $qtd_parcelas
-            );
+            if ($user->tipo_contrato === 'pj') {
+                PjComissaoService::criarParcelas($comissao, $request->data_adesao);
+            } else {
+                $this->lancarParcelas(
+                    $comissao, $user, $corretora_id,
+                    $valor_plano, $valor_adesao,
+                    $request->data_adesao,
+                    $request->data_boleto,
+                    $qtd_parcelas
+                );
+            }
 
             DB::commit();
+
+            // Para PJ: recalcula vidas e comissões do mês de cadastro
+            if ($user->tipo_contrato === 'pj') {
+                $mes = date('Y-m', strtotime($request->data_cadastro));
+                PjComissaoService::recalcularMes($user->id, $mes);
+            }
         } catch (\Exception $e) {
             DB::rollBack();
             return back()

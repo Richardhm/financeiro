@@ -17,7 +17,7 @@ class ClienteController extends Controller
     {
             $user_id = auth()->user()->id;
             // Consulta base
-            $query = DB::connection('tenant')->table('comissoes_corretores_lancadas')
+            $query = DB::table('comissoes_corretores_lancadas')
                 ->join('comissoes', 'comissoes.id', '=', 'comissoes_corretores_lancadas.comissoes_id')
                 ->join('contratos', 'contratos.id', '=', 'comissoes.contrato_id')
                 ->join('clientes', 'clientes.id', '=', 'contratos.cliente_id')
@@ -81,7 +81,7 @@ class ClienteController extends Controller
     public function listarColetivo()
     {
         $user_id = auth()->user()->id;
-        $query = DB::connection('tenant')->table('comissoes_corretores_lancadas')
+        $query = DB::table('comissoes_corretores_lancadas')
             ->select(
                 DB::raw("DATE_FORMAT(contratos.created_at,'%d/%m/%Y') as data"),
                 DB::raw("DATE_FORMAT(contratos.created_at,'%Y-%m-%d') as data_contrato"),
@@ -140,7 +140,7 @@ class ClienteController extends Controller
     public function listarEmpresarial(Request $request)
     {
         $user_id = auth()->user()->id;
-        $query = DB::connection('tenant')->table('comissoes_corretores_lancadas')
+        $query = DB::table('comissoes_corretores_lancadas')
             ->select(
                 DB::raw("DATE_FORMAT(contrato_empresarial.created_at,'%d/%m/%Y') as created_at"),
                 'contrato_empresarial.codigo_externo as codigo_externo',

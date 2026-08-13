@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use App\Models\ParceirosRegraComissao;
 use App\Services\ParceirosComissaoService;
+use App\Services\PjComissaoService;
 use Carbon\Carbon;
 
 class ProcessSpreadsheet extends Command
@@ -43,8 +44,9 @@ class ProcessSpreadsheet extends Command
             $reader = ReaderEntityFactory::createReaderFromFile($filePath);
             $reader->open($filePath);
 
-            $processedRows  = 0;
+            $processedRows    = 0;
             $parceirosTouched = [];
+            $pjTouched        = [];
 
             foreach ($reader->getSheetIterator() as $sheet) {
                 foreach ($sheet->getRowIterator() as $rowNumber => $row) {
@@ -125,6 +127,13 @@ class ProcessSpreadsheet extends Command
                                     if ($user->tipo_contrato === 'parceiro') {
                                         $parceirosTouched[$user->id] = true;
                                     }
+                                    if ($user->tipo_contrato === 'pj' && $c->parcela == 1) {
+                                        // Rastreia pelo mês de created_at do contrato (quando foi vendido)
+                                        $mesCadastro = isset($contrato) && $contrato
+                                            ? date('Y-m', strtotime($contrato->created_at))
+                                            : $competencia;
+                                        $pjTouched[$user->id][$mesCadastro] = true;
+                                    }
                                 }
                             }
                         }
@@ -137,6 +146,36 @@ class ProcessSpreadsheet extends Command
                             ->whereRaw("LEFT(cateirinha, 11) = ?", [$spreadsheetCode])
                             ->with(['contrato', 'contrato.comissao', 'contrato.comissao.comissoesLancadas'])
                             ->first();
+
+                        // Atualizar contratos.created_at com a data da planilha (col 6 = data contrato)
+                        if ($carteirinha_existe && isset($cells[6]) && $cells[6]->getValue() instanceof \DateTime) {
+                            $contratoObj = $carteirinha_existe->contrato;
+                            if ($contratoObj) {
+                                $contratoObj->created_at = $cells[6]->getValue()->format('Y-m-d');
+                                $contratoObj->saveQuietly();
+                            }
+                        }
+
+                        // Criar CCL PJ se ainda não existe para este contrato
+                        if ($carteirinha_existe) {
+                            $comissaoObj = $carteirinha_existe->contrato->comissao ?? null;
+                            if ($comissaoObj && !ComissoesCorretoresLancadas::where('comissoes_id', $comissaoObj->id)->exists()) {
+                                $userObj = User::find($carteirinha_existe->user_id);
+                                if ($userObj && $userObj->tipo_contrato === 'pj') {
+                                    PjComissaoService::criarParcelas($comissaoObj, $cells[13]->getValue()->format('Y-m-d'));
+                                } elseif ($userObj) {
+                                    $this->cadastrarComissao(
+                                        $userObj,
+                                        $this->parseNumber($cells[10]->getValue()),
+                                        $comissaoObj,
+                                        $carteirinha_existe->dia ?? 1,
+                                        $cells[13]->getValue()->format('Y-m-d')
+                                    );
+                                }
+                                // Recarrega a relação após criação
+                                $carteirinha_existe->load('contrato.comissao.comissoesLancadas');
+                            }
+                        }
 
                         if (($cells[11]->getValue() == "LIQUIDADO" || $cells[11]->getValue() == "LIQUIDADO N/COB") && $carteirinha_existe) {
                             $comissoes    = $carteirinha_existe->contrato->comissao->comissoesLancadas;
@@ -175,6 +214,12 @@ class ProcessSpreadsheet extends Command
                                         if ($userCli && $userCli->tipo_contrato === 'parceiro') {
                                             $parceirosTouched[$userCli->id] = true;
                                         }
+                                        if ($userCli && $userCli->tipo_contrato === 'pj' && $c->parcela == 1) {
+                                            $mesCadastro = $carteirinha_existe->contrato->created_at
+                                                ? date('Y-m', strtotime($carteirinha_existe->contrato->created_at))
+                                                : $competencia;
+                                            $pjTouched[$userCli->id][$mesCadastro] = true;
+                                        }
                                     }
                                 }
                             }
@@ -187,6 +232,14 @@ class ProcessSpreadsheet extends Command
             foreach (array_keys($parceirosTouched) as $parceiroId) {
                 ParceirosComissaoService::aplicarRegra($parceiroId);
                 Log::info("Regras de comissão aplicadas para parceiro ID: {$parceiroId}");
+            }
+
+            // Recalcular vidas e comissões PJ por vendedor/mês-cadastro
+            foreach ($pjTouched as $userId => $meses) {
+                foreach (array_keys($meses) as $mes) {
+                    PjComissaoService::recalcularMes($userId, $mes);
+                    Log::info("PjComissaoService disparado via spreadsheet: user={$userId} mes={$mes}");
+                }
             }
 
             $this->atualizarContrato();
@@ -228,7 +281,7 @@ class ProcessSpreadsheet extends Command
         $cliente = Cliente::select('clientes.*')
             ->join('contratos', 'contratos.cliente_id', '=', 'clientes.id')
             ->where('clientes.nome', $nome)
-            ->where('contratos.valor_adesao', $valor)
+            ->where('contratos.valor_plano', $valor)
             ->first();
 
         return $cliente ? $cliente->id : null;
@@ -265,6 +318,11 @@ class ProcessSpreadsheet extends Command
     {
         if ($user->tipo_contrato === 'parceiro') {
             $this->cadastrarComissaoParceiro($user, $valor, $comissao, $data_vigencia);
+            return;
+        }
+
+        if ($user->tipo_contrato === 'pj') {
+            PjComissaoService::criarParcelas($comissao, $data_vigencia);
             return;
         }
 

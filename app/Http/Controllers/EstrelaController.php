@@ -34,7 +34,7 @@ class EstrelaController extends Controller
 
 
 
-            $ranking_semestre = DB::connection('tenant')->select("
+            $ranking_semestre = DB::select("
         SELECT
             users.name AS usuario,
             users.image AS imagem,
@@ -74,7 +74,7 @@ class EstrelaController extends Controller
             $startDate = $ano_atual . "-07-01";
             $endDate = $ano_atual . "-12-31";
             $semestreAtual = "2/".date("Y");
-            $ranking_semestre = DB::connection('tenant')->select("
+            $ranking_semestre = DB::select("
         SELECT
             users.name AS usuario,
             users.image AS imagem,

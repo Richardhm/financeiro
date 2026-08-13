@@ -33,17 +33,27 @@ jobs:
     - name: 🔨 Build assets (Vite)
       run: npm run build
 
-    - name: 📂 Sync files
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+    - name: 📂 Sync files (rsync via SSH)
+      uses: easingthemes/ssh-deploy@v5.1.0
       with:
-        server: ${{ secrets.FTP_HOST }}
-        username: ${{ secrets.FTP_USER }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        server-dir: /
-        exclude: |
-          **/.git*
-          **/.git*/**
-          **/node_modules/**
-          **/tests/**
-          **/.env
-          **/storage/logs/**
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        REMOTE_HOST: ${{ secrets.SSH_HOST }}
+        REMOTE_USER: ${{ secrets.SSH_USER }}
+        REMOTE_PORT: ${{ secrets.SSH_PORT }}
+        TARGET: ${{ secrets.DEPLOY_PATH }}
+        ARGS: "-avz --delete"
+        EXCLUDE: ".git/, .github/, node_modules/, tests/, .env, storage/"
+
+    - name: 🛠️ Run post-deploy commands
+      uses: appleboy/ssh-action@v1.2.0
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: ${{ secrets.SSH_PORT }}
+        script: |
+          cd ${{ secrets.DEPLOY_PATH }}
+          php artisan migrate --force
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache

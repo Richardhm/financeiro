@@ -14,9 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         __DIR__.'/../app/Console/Commands',
     ])
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->web([
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
+        //
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

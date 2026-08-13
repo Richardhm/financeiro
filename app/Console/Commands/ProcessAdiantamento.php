@@ -19,7 +19,6 @@ class ProcessAdiantamento extends Command
 
         try {
 
-            config(['database.connections.tenant.database' => 'bmsysc98_america_bmsys']);
 
             $controller = new ConfirmacaoPagamentoController();
             $controller->processarEmBackground($filePath, $jobId);

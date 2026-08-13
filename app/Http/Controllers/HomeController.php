@@ -985,7 +985,7 @@ class HomeController extends Controller
             $semestreAtual = "2/".date("Y");
         }
 
-        $ranking_semestre = DB::connection('tenant')->select(
+        $ranking_semestre = DB::select(
             "
             select
             users.name as usuario,
@@ -1024,7 +1024,7 @@ class HomeController extends Controller
 
 
 
-        $ranking_ano = DB::connection('tenant')->select(
+        $ranking_ano = DB::select(
             "
             select
             users.name as usuario,
@@ -1062,7 +1062,7 @@ class HomeController extends Controller
 
         $users = User::where("id","!=",1)->where("ativo",1)->orderBy("name")->get();
 
-        $ranking_mes = DB::connection('tenant')->select(
+        $ranking_mes = DB::select(
             "
             select
             users.name as usuario,
@@ -1107,7 +1107,7 @@ class HomeController extends Controller
         $mesFinalSemestre = ($semestreAtual == 1) ? 6 : 12;
         $anoAtual = date("Y");
 
-        $mesesSelect = DB::connection('tenant')->select(
+        $mesesSelect = DB::select(
             "
                 SELECT *
                     FROM (
@@ -1599,7 +1599,7 @@ class HomeController extends Controller
             ];
         });
 
-        $dados_tabela = DB::connection('tenant')->select(
+        $dados_tabela = DB::select(
             "
             SELECT
                 u.name AS user_name,

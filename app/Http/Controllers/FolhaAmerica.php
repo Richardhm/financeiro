@@ -13,6 +13,7 @@ use App\Models\RegraComissaoPj;
 use App\Models\Plano;
 use App\Models\ParceirosConfigPagamento;
 use App\Models\ParceirosRegraComissao;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -4213,6 +4214,87 @@ class FolhaAmerica extends Controller
             ->delete();
 
         return redirect()->route('folha.america.regras-pj')->with('success', 'Regra removida.');
+    }
+
+    // ==================== TEMPLATE COMISSOES PJ/CLT ====================
+
+    public function indexTemplateComissoes()
+    {
+        $planos = Plano::orderBy('nome')->get();
+
+        $vendedores = User::where('corretora_id', $this->corretora_id)
+            ->whereIn('tipo_contrato', ['pj', 'clt'])
+            ->orderBy('name')
+            ->get();
+
+        $templates = DB::table('comissoes_corretores_configuracoes as ccc')
+            ->leftJoin('planos as p', 'ccc.plano_id', '=', 'p.id')
+            ->leftJoin('users as u', 'ccc.user_id', '=', 'u.id')
+            ->where('ccc.corretora_id', $this->corretora_id)
+            ->select('ccc.plano_id', 'ccc.user_id', 'ccc.parcela', 'ccc.valor',
+                     'p.nome as plano_nome', 'u.name as user_nome')
+            ->orderBy('ccc.plano_id')
+            ->orderByRaw('ccc.user_id IS NULL DESC')
+            ->orderBy('u.name')
+            ->orderBy('ccc.parcela')
+            ->get()
+            ->groupBy(fn($r) => $r->plano_id . '_' . ($r->user_id ?? 'null'));
+
+        return view('folha.america.template-comissoes', compact('planos', 'vendedores', 'templates'));
+    }
+
+    public function salvarTemplateComissoes(Request $request)
+    {
+        $request->validate([
+            'plano_id'  => 'required|exists:planos,id',
+            'user_id'   => 'nullable|exists:users,id',
+            'valores'   => 'required|array|min:1',
+            'valores.*' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $planoId = (int) $request->plano_id;
+        $userId  = $request->user_id ?: null;
+
+        DB::table('comissoes_corretores_configuracoes')
+            ->where('corretora_id', $this->corretora_id)
+            ->where('plano_id', $planoId)
+            ->when($userId, fn($q) => $q->where('user_id', $userId),
+                           fn($q) => $q->whereNull('user_id'))
+            ->delete();
+
+        $now  = now();
+        $rows = [];
+        foreach ($request->valores as $parcela => $valor) {
+            $rows[] = [
+                'corretora_id' => $this->corretora_id,
+                'plano_id'     => $planoId,
+                'user_id'      => $userId,
+                'parcela'      => (int) $parcela,
+                'valor'        => (float) $valor,
+                'created_at'   => $now,
+                'updated_at'   => $now,
+            ];
+        }
+
+        DB::table('comissoes_corretores_configuracoes')->insert($rows);
+
+        return redirect()->route('folha.america.template-comissoes')
+            ->with('success', 'Template salvo com sucesso.');
+    }
+
+    public function deletarTemplateComissoes(Request $request)
+    {
+        $planoId = (int) $request->plano_id;
+        $userId  = $request->user_id ?: null;
+
+        DB::table('comissoes_corretores_configuracoes')
+            ->where('corretora_id', $this->corretora_id)
+            ->where('plano_id', $planoId)
+            ->when($userId, fn($q) => $q->where('user_id', $userId),
+                           fn($q) => $q->whereNull('user_id'))
+            ->delete();
+
+        return response()->json(['success' => true]);
     }
 
     // ==================== REGRAS COMISSAO PARCEIROS ====================

@@ -19,6 +19,7 @@ use App\Models\ContratoEmpresarial;
 use App\Models\Dependente;
 use App\Models\MotivoCancelado;
 use App\Models\Odonto;
+use App\Models\ParceirosRegraComissao;
 use App\Models\Plano;
 use App\Models\TabelaOrigens;
 use App\Models\User;
@@ -756,6 +757,7 @@ class FinanceiroController extends Controller
         $corretora_id = User::find($request->user_id)->corretora_id;
         $codigo_vendedor = User::find($request->user_id)->codigo_vendedor;
         $clt = User::find($request->user_id)->clt;
+        $tipo_contrato = User::find($request->user_id)->tipo_contrato;
 
         $dados = $request->except('_token');
         $dados['taxa_adesao'] = str_replace([".", ","], ["", "."], $request->taxa_adesao);
@@ -783,6 +785,7 @@ class FinanceiroController extends Controller
             $dados['desconto_operadora'] = 0;
             $dados['quantidade_parcelas'] = 0;
         }
+        $dados['desconto_comissao_665'] = $request->boolean('desconto_comissao_665');
 
         $valor = $dados['valor_plano'];
         $contrato = ContratoEmpresarial::create($dados);
@@ -806,7 +809,47 @@ class FinanceiroController extends Controller
         $valorComDesconto = 0;
         $comissao_corretor_default = 0;
 
-        if($clt == 1) {
+        if ($tipo_contrato === 'parceiro') {
+            $regraParceiro = ParceirosRegraComissao::where('corretora_id', $corretora_id)
+                ->where('parceiro_id', $request->user_id)
+                ->where('plano_id', $request->plano_id)
+                ->first();
+
+            if ($regraParceiro) {
+                $percentuaisParceiro = [
+                    1 => (float) $regraParceiro->parcela_1_pct,
+                    2 => (float) $regraParceiro->parcela_2_pct,
+                    3 => (float) $regraParceiro->parcela_3_pct,
+                    4 => (float) $regraParceiro->parcela_4_pct,
+                    5 => (float) $regraParceiro->parcela_5_pct,
+                    6 => (float) $regraParceiro->parcela_6_pct,
+                ];
+
+                foreach ($percentuaisParceiro as $parcela => $pct) {
+                    $comissaoVendedor = new ComissoesCorretoresLancadas();
+                    $comissaoVendedor->comissoes_id = $comissao->id;
+                    $comissaoVendedor->parcela = $parcela;
+                    if ($comissao_corretor_contagem == 0) {
+                        $comissaoVendedor->data = date('Y-m-d H:i:s', strtotime($request->data_boleto));
+                    } else {
+                        $comissaoVendedor->data = date("Y-m-d H:i:s", strtotime($request->data_boleto . "+{$comissao_corretor_contagem}month"));
+                    }
+                    if ($dados['quantidade_parcelas'] >= 1 && $dados['desconto'] >= 0) {
+                        if ($comissao_corretor_contagem <= $dados['quantidade_parcelas']) {
+                            $valorComDesconto = ($valor * (1 - $dados['desconto'] / 100)) * $pct / 100;
+                        }
+                    } else {
+                        $valorComDesconto = ($valor * $pct) / 100;
+                    }
+                    if ($dados['desconto_comissao_665']) {
+                        $valorComDesconto *= (1 - 0.0665);
+                    }
+                    $comissaoVendedor->valor = $valorComDesconto;
+                    $comissaoVendedor->save();
+                    $comissao_corretor_contagem++;
+                }
+            }
+        } elseif($clt == 1) {
             $dado = ComissoesCorretoresDefault
                 ::where("plano_id", $request->plano_id)
                 ->where("administradora_id", 4)
@@ -833,6 +876,9 @@ class FinanceiroController extends Controller
                     }
                 } else {
                     $valorComDesconto = ($valor * $c->valor) / 100;
+                }
+                if ($dados['desconto_comissao_665']) {
+                    $valorComDesconto *= (1 - 0.0665);
                 }
                 $comissaoVendedor->valor = $valorComDesconto;
                 $comissaoVendedor->save();
@@ -867,6 +913,9 @@ class FinanceiroController extends Controller
                     } else {
                         $valorComDesconto = ($valor * $c->valor) / 100;
                     }
+                    if ($dados['desconto_comissao_665']) {
+                        $valorComDesconto *= (1 - 0.0665);
+                    }
                     $comissaoVendedor->valor = $valorComDesconto;
                     $comissaoVendedor->save();
                     $comissao_corretor_contagem++;
@@ -900,6 +949,9 @@ class FinanceiroController extends Controller
                         }
                     } else {
                         $valorComDesconto = ($valor * $c->valor) / 100;
+                    }
+                    if ($dados['desconto_comissao_665']) {
+                        $valorComDesconto *= (1 - 0.0665);
                     }
                     $comissaoVendedor->valor = $valorComDesconto;
                     $comissaoVendedor->save();

@@ -43,6 +43,7 @@ class ContratoEmpresarial extends Model
         'uf',
         'plano_contrado',
         'desconto_operadora',
+        'desconto_comissao_665',
         'quantidade_parcelas',
         'corretora_id',
         'pdf_path'

@@ -269,6 +269,12 @@
                             <input type="text" name="desconto_corretor" id="desconto_corretor" value="{{old('desconto_corretor')}}" class="w-full text-sm rounded-lg placeholder:text-white p-1 bg-[rgba(254,254,254,0.18)] text-white backdrop-blur-[15px] border-white border-2" placeholder="Desconto Corretor">
                         </div>
 
+                        <div class="flex items-center">
+                            <label for="desconto_comissao_665" class="flex items-center gap-2 text-xs font-medium text-white cursor-pointer">
+                                <input type="checkbox" name="desconto_comissao_665" id="desconto_comissao_665" value="1" {{ old('desconto_comissao_665') ? 'checked' : '' }}>
+                                Descontar 6,65% da comissão do vendedor
+                            </label>
+                        </div>
 
                     </div>
                 </div>

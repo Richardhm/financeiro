@@ -44,8 +44,6 @@ class ProcessSpreadsheetJob implements ShouldQueue
         try {
             Log::info("=== JOB INICIADO: {$this->jobId} ===");
 
-            // ⚡ CONFIGURAR TENANT
-            config(['database.connections.tenant.database' => 'bmsysc98_america_bmsys']);
 
             // ⚡ CONTAR TOTAL DE LINHAS
             $totalLines = $this->countTotalLines();
@@ -147,17 +145,17 @@ class ProcessSpreadsheetJob implements ShouldQueue
         $valor = $cells[10]->getValue();
 
         if ($id_alt = $this->verificarCarteirinha($nome, $valor)) {
-            $cliente_alt = Cliente::on('tenant')->find($id_alt);
-            $user = User::on('tenant')->find($cliente_alt->user_id);
+            $cliente_alt = Cliente::query()->find($id_alt);
+            $user = User::query()->find($cliente_alt->user_id);
             $cliente_alt->cateirinha = $cells[5]->getValue();
             $cliente_alt->save();
 
-            $contrato_id = Contrato::on('tenant')->where("cliente_id", $id_alt)->first()->id;
-            $cc = Contrato::on('tenant')->find($contrato_id);
+            $contrato_id = Contrato::query()->where("cliente_id", $id_alt)->first()->id;
+            $cc = Contrato::query()->find($contrato_id);
             $cc->created_at = $cells[6]->getValue()->format('Y-m-d');
             $cc->save();
 
-            $comissao = Comissao::on('tenant')->where("contrato_id", $contrato_id)->first();
+            $comissao = Comissao::query()->where("contrato_id", $contrato_id)->first();
 
             if ($cells[11]->getValue() == "LIQUIDADO" || $cells[11]->getValue() == "LIQUIDADO N/COB") {
                 if ($cliente_alt) {
@@ -166,7 +164,7 @@ class ProcessSpreadsheetJob implements ShouldQueue
                     $dt_pagamento = $cells[12]->getValue()->format('Y-m-d');
 
                     foreach ($comissoes as $c) {
-                        $datasCadastradas = ComissoesCorretoresLancadas::on('tenant')
+                        $datasCadastradas = ComissoesCorretoresLancadas::query()
                             ->where('comissoes_id', $c->comissoes_id)
                             ->whereNotNull('data')
                             ->pluck('data');
@@ -174,14 +172,14 @@ class ProcessSpreadsheetJob implements ShouldQueue
                         $dataMenor = $datasCadastradas->every(fn($data) => $vencimento < $data);
 
                         if ($dataMenor) {
-                            ComissoesCorretoresLancadas::on('tenant')
+                            ComissoesCorretoresLancadas::query()
                                 ->where('comissoes_id', $c->comissoes_id)
                                 ->where('parcela', 1)
                                 ->update(['data_baixa' => $dt_pagamento]);
                         }
 
                         if (date('m', strtotime($c->data)) == date('m', strtotime($vencimento))) {
-                            ComissoesCorretoresLancadas::on('tenant')
+                            ComissoesCorretoresLancadas::query()
                                 ->find($c->id)
                                 ->update([
                                     'status_financeiro' => 1,
@@ -194,7 +192,7 @@ class ProcessSpreadsheetJob implements ShouldQueue
             }
         } else {
             $spreadsheetCode = $cells[5]->getValue();
-            $carteirinha_existe = Cliente::on('tenant')
+            $carteirinha_existe = Cliente::query()
                 ->select('clientes.*')
                 ->join('users', 'users.id', '=', 'clientes.user_id')
                 ->join('contratos', 'contratos.cliente_id', '=', 'clientes.id')
@@ -209,7 +207,7 @@ class ProcessSpreadsheetJob implements ShouldQueue
                     $dt_pagamento = $cells[12]->getValue()->format('Y-m-d');
 
                     foreach ($comissoes as $c) {
-                        $datasCadastradas = ComissoesCorretoresLancadas::on('tenant')
+                        $datasCadastradas = ComissoesCorretoresLancadas::query()
                             ->where('comissoes_id', $c->comissoes_id)
                             ->whereNotNull('data')
                             ->pluck('data');
@@ -217,14 +215,14 @@ class ProcessSpreadsheetJob implements ShouldQueue
                         $dataMenor = $datasCadastradas->every(fn($data) => $vencimento < $data);
 
                         if ($dataMenor) {
-                            ComissoesCorretoresLancadas::on('tenant')
+                            ComissoesCorretoresLancadas::query()
                                 ->where('comissoes_id', $c->comissoes_id)
                                 ->where('parcela', 1)
                                 ->update(['data_baixa' => $dt_pagamento]);
                         }
 
                         if (date('m', strtotime($c->data)) == date('m', strtotime($vencimento))) {
-                            ComissoesCorretoresLancadas::on('tenant')
+                            ComissoesCorretoresLancadas::query()
                                 ->find($c->id)
                                 ->update([
                                     'status_financeiro' => 1,
@@ -291,7 +289,7 @@ class ProcessSpreadsheetJob implements ShouldQueue
 
     private function verificarCarteirinha($nome, $valor)
     {
-        $cliente = Cliente::on('tenant')
+        $cliente = Cliente::query()
             ->select('clientes.*')
             ->join('users', 'users.id', '=', 'clientes.user_id')
             ->join('contratos', 'contratos.cliente_id', '=', 'clientes.id')
@@ -304,7 +302,7 @@ class ProcessSpreadsheetJob implements ShouldQueue
 
     private function atualizarContrato()
     {
-        $comissoes = DB::connection('tenant')->select("
+        $comissoes = DB::select("
                select * from comissoes_corretores_lancadas where
                comissoes_id IN(select id from comissoes where contrato_id IN(select id from contratos where plano_id = 1))
                and status_financeiro = 1
@@ -313,28 +311,28 @@ class ProcessSpreadsheetJob implements ShouldQueue
         foreach($comissoes as $cc) {
             switch ($cc->parcela) {
                 case 2:
-                    $contrato_id = Comissao::on('tenant')->where("id", $cc->comissoes_id)->first()->contrato_id;
-                    Contrato::on('tenant')->where("id", $contrato_id)->update(["financeiro_id" => 6]);
+                    $contrato_id = Comissao::query()->where("id", $cc->comissoes_id)->first()->contrato_id;
+                    Contrato::query()->where("id", $contrato_id)->update(["financeiro_id" => 6]);
                     break;
                 case 3:
-                    $contrato_id = Comissao::on('tenant')->where("id", $cc->comissoes_id)->first()->contrato_id;
-                    Contrato::on('tenant')->where("id", $contrato_id)->update(["financeiro_id" => 7]);
+                    $contrato_id = Comissao::query()->where("id", $cc->comissoes_id)->first()->contrato_id;
+                    Contrato::query()->where("id", $contrato_id)->update(["financeiro_id" => 7]);
                     break;
                 case 4:
-                    $contrato_id = Comissao::on('tenant')->where("id", $cc->comissoes_id)->first()->contrato_id;
-                    Contrato::on('tenant')->where("id", $contrato_id)->update(["financeiro_id" => 8]);
+                    $contrato_id = Comissao::query()->where("id", $cc->comissoes_id)->first()->contrato_id;
+                    Contrato::query()->where("id", $contrato_id)->update(["financeiro_id" => 8]);
                     break;
                 case 5:
-                    $contrato_id = Comissao::on('tenant')->where("id", $cc->comissoes_id)->first()->contrato_id;
-                    Contrato::on('tenant')->where("id", $contrato_id)->update(["financeiro_id" => 9]);
+                    $contrato_id = Comissao::query()->where("id", $cc->comissoes_id)->first()->contrato_id;
+                    Contrato::query()->where("id", $contrato_id)->update(["financeiro_id" => 9]);
                     break;
                 case 6:
-                    $contrato_id = Comissao::on('tenant')->where("id", $cc->comissoes_id)->first()->contrato_id;
-                    Contrato::on('tenant')->where("id", $contrato_id)->update(["financeiro_id" => 11]);
+                    $contrato_id = Comissao::query()->where("id", $cc->comissoes_id)->first()->contrato_id;
+                    Contrato::query()->where("id", $contrato_id)->update(["financeiro_id" => 11]);
                     break;
                 default:
-                    $contrato_id = Comissao::on('tenant')->where("id", $cc->comissoes_id)->first()->contrato_id;
-                    Contrato::on('tenant')->where("id", $contrato_id)->update(["financeiro_id" => 5]);
+                    $contrato_id = Comissao::query()->where("id", $cc->comissoes_id)->first()->contrato_id;
+                    Contrato::query()->where("id", $contrato_id)->update(["financeiro_id" => 5]);
                     break;
             }
         }

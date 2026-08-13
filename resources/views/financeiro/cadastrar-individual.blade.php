@@ -196,21 +196,28 @@
 <hr class="divider">
 <div class="section-title">Adesão &amp; Parcelas</div>
 <div class="form-row cols-4">
+    <div class="form-group" style="border:1px solid #3b6fd4;border-radius:6px;padding:8px 10px;background:rgba(59,111,212,0.08);">
+        <label>Data Cadastro <span class="req">*</span></label>
+        <input type="date" name="data_cadastro" id="data_cadastro" value="{{ old('data_cadastro', date('Y-m-d')) }}" required>
+        <p class="hint" style="color:#7eb8f7">Define o mês de vidas para cálculo da comissão PJ</p>
+    </div>
     <div class="form-group">
         <label>Data Adesão <span class="req">*</span></label>
         <input type="date" name="data_adesao" id="data_adesao" value="{{ old('data_adesao') }}" required>
         <p class="hint">Data da assinatura / vigência</p>
     </div>
     <div class="form-group">
-        <label>Data Baixa do Contrato</label>
-        <input type="date" name="data_baixa" value="{{ old('data_baixa') }}">
-        <p class="hint">Data de encerramento (opcional)</p>
-    </div>
-    <div class="form-group">
         <label>Data 1º Boleto <span class="req">*</span></label>
         <input type="date" name="data_boleto" id="data_boleto" value="{{ old('data_boleto') }}" required>
         <p class="hint">Gera as parcelas 2 em diante</p>
     </div>
+    <div class="form-group">
+        <label>Data Baixa do Contrato</label>
+        <input type="date" name="data_baixa" value="{{ old('data_baixa') }}">
+        <p class="hint">Data de encerramento (opcional)</p>
+    </div>
+</div>
+<div class="form-row cols-2" style="max-width:300px">
     <div class="form-group">
         <label>Qtd. Parcelas <span class="req">*</span></label>
         <input type="number" name="qtd_parcelas" id="qtd_parcelas" value="{{ old('qtd_parcelas', 6) }}" required min="1" max="24">

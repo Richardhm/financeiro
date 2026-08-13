@@ -8,6 +8,7 @@ use App\Models\ComissoesCorretoresDefault;
 use App\Models\ComissoesCorretoresLancadas;
 use App\Models\ContratoEmpresarial;
 use App\Models\DependenteEmpresarial;
+use App\Models\ParceirosRegraComissao;
 use App\Models\TabelaOrigens;
 use App\Models\User;
 use App\Services\PdfParser\HapvidaEmpresarialPdfParser;
@@ -95,6 +96,7 @@ class PdfContratoEmpresarialController extends Controller
         $desconto_op     = $request->desconto && (float)$request->desconto > 0 ? (float)$request->desconto : 0;
         $qtd_parcelas_dc = $desconto_op > 0 ? (int)($request->quantidade_parcelas ?? 0) : 0;
         $desconto_corretor = $request->desconto_corretor ? (float)$request->desconto_corretor : 0;
+        $desconto_comissao_665 = $request->boolean('desconto_comissao_665');
 
         DB::beginTransaction();
         try {
@@ -133,6 +135,7 @@ class PdfContratoEmpresarialController extends Controller
                 'desconto_corretor'  => $desconto_corretor,
                 'desconto_corretora' => 0,
                 'desconto_operadora' => $desconto_op,
+                'desconto_comissao_665' => $desconto_comissao_665,
                 'quantidade_parcelas'=> $qtd_parcelas_dc,
             ];
 
@@ -186,7 +189,8 @@ class PdfContratoEmpresarialController extends Controller
                 $valor_plano,
                 $request->data_boleto,
                 $desconto_op,
-                $qtd_parcelas_dc
+                $qtd_parcelas_dc,
+                $desconto_comissao_665
             );
 
             DB::commit();
@@ -262,18 +266,56 @@ class PdfContratoEmpresarialController extends Controller
     private function lancarComissoesCorretor(
         Comissoes $comissao, User $user, int $corretoraId,
         float $valor, string $dataBoleto,
-        float $descontoOp = 0, int $qtdParcelas = 0
+        float $descontoOp = 0, int $qtdParcelas = 0,
+        bool $descontoComissao665 = false
     ): void {
-        $calcValor = function(float $pct, int $parcela) use ($valor, $descontoOp, $qtdParcelas): float {
-            if ($descontoOp > 0 && $qtdParcelas >= 1 && $parcela <= $qtdParcelas) {
-                return ($valor * (1 - $descontoOp / 100)) * $pct / 100;
+        $calcValor = function(float $pct, int $parcela) use ($valor, $descontoOp, $qtdParcelas, $descontoComissao665): float {
+            $base = ($descontoOp > 0 && $qtdParcelas >= 1 && $parcela <= $qtdParcelas)
+                ? $valor * (1 - $descontoOp / 100)
+                : $valor;
+
+            $valorComissao = $base * $pct / 100;
+
+            if ($descontoComissao665) {
+                $valorComissao *= (1 - 0.0665);
             }
-            return ($valor * $pct) / 100;
+
+            return $valorComissao;
         };
 
         $contagem = 0;
 
-        if ($user->clt == 1) {
+        if ($user->tipo_contrato === 'parceiro') {
+            $regra = ParceirosRegraComissao::where('corretora_id', $corretoraId)
+                ->where('parceiro_id', $user->id)
+                ->where('plano_id', 5)
+                ->first();
+
+            if (!$regra) {
+                return;
+            }
+
+            $percentuais = [
+                1 => (float) $regra->parcela_1_pct,
+                2 => (float) $regra->parcela_2_pct,
+                3 => (float) $regra->parcela_3_pct,
+                4 => (float) $regra->parcela_4_pct,
+                5 => (float) $regra->parcela_5_pct,
+                6 => (float) $regra->parcela_6_pct,
+            ];
+
+            foreach ($percentuais as $parcela => $pct) {
+                $contagem++;
+                $lancada = new ComissoesCorretoresLancadas();
+                $lancada->comissoes_id = $comissao->id;
+                $lancada->parcela      = $parcela;
+                $lancada->data         = $contagem === 1
+                    ? $dataBoleto
+                    : date('Y-m-d', strtotime($dataBoleto . '+' . ($contagem - 1) . ' month'));
+                $lancada->valor = $pct > 0 ? $calcValor($pct, $contagem) : 0;
+                $lancada->save();
+            }
+        } elseif ($user->clt == 1) {
             $dados = ComissoesCorretoresDefault::where('plano_id', 5)
                 ->where('administradora_id', 4)
                 ->where('corretora_id', $corretoraId)

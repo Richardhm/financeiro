@@ -49,7 +49,7 @@ class ProcessarPagamentoJob implements ShouldQueue
         $data_comissao = date($ano."-".$mes."-01");
 
         // Atualiza a comiss達o do corretor
-        $co = ComissoesCorretoresLancadas::on('tenant')->find($id);
+        $co = ComissoesCorretoresLancadas::query()->find($id);
         $co->status_apto_pagar = 1;
         $co->status_comissao = 1;
         $co->finalizado = 1;
@@ -57,7 +57,7 @@ class ProcessarPagamentoJob implements ShouldQueue
         $co->save();
 
         // Processa ou atualiza os valores
-        $va = ValoresCorretoresLancados::on('tenant')->where("user_id", $user_id)
+        $va = ValoresCorretoresLancados::query()->where("user_id", $user_id)
             ->whereMonth('data', $mes)
             ->whereYear('data', $ano);
 

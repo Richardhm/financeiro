@@ -1004,6 +1004,11 @@ input.fim-date-action::-webkit-calendar-picker-indicator {
 }
 input.fim-date-action:hover::-webkit-calendar-picker-indicator { opacity: 1; }
 
+/* ícone branco no seletor de data da baixa empresarial */
+input.fim-date-action.next_empresarial::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+}
+
 .desfazer_individual {
     width: 18px !important; height: 18px !important;
     color: #f97316 !important;

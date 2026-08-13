@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class Contrato extends Model
 {
-    // Usa a conexão tenant dinâmica
 
     protected $table = 'contratos';
 
