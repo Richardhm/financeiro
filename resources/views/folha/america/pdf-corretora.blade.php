@@ -152,7 +152,7 @@
                 <td>{{ $corretor['corretor']->name }}</td>
                 <td class="valor">R$ {{ number_format($corretor['total'], 2, ',', '.') }}</td>
                 <td>{{ $corretor['vidas'] }}</td>
-                <td>{{ $corretor['comissoes']->unique('contrato_codigo')->count() }}</td>
+                <td>{{ $corretor['contratos'] }}</td>
                 <td>
                     R$ {{ number_format($corretor['vidas'] > 0 ? $corretor['total'] / $corretor['vidas'] : 0, 2, ',', '.') }}
                 </td>

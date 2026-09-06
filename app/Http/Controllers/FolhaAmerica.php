@@ -75,6 +75,23 @@ class FolhaAmerica extends Controller
             ->orderBy('vidas_min')
             ->get(['id', 'nome', 'vidas_min', 'vidas_max']);
 
+        // Vidas da COMPETENCIA aberta por vendedor CLT — mesma contagem do
+        // aplicarFaixaCltVendedor (contratos unicos com parcela pendente no mes),
+        // para o rotulo "Regra X - N vidas" bater com o recalculo real
+        $competenciaAberta = Carbon::parse($folhaMes->mes)->format('Y-m');
+        $vidasClt = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->join('users as u', 'u.id', '=', 'c.user_id')
+            ->where('u.corretora_id', $this->corretora_id)
+            ->where('u.tipo_contrato', 'clt')
+            ->where('ccl.status_financeiro', 1)
+            ->where('ccl.competencia', $competenciaAberta)
+            ->where('ccl.finalizado', '!=', 1)
+            ->whereNull('ccl.data_baixa_gerente_folha')
+            ->groupBy('c.user_id')
+            ->selectRaw('c.user_id, COUNT(DISTINCT ccl.comissoes_id) as vidas')
+            ->pluck('vidas', 'user_id');
+
         return view('folha.america.index', compact(
             'resumoGeral',
             'resumoPorPlano',
@@ -88,7 +105,8 @@ class FolhaAmerica extends Controller
             'mesAtual',
             'dadosMes',
             'folhaEmAberto',
-            'faixasClt'
+            'faixasClt',
+            'vidasClt'
         ));
     }
 
@@ -342,6 +360,16 @@ class FolhaAmerica extends Controller
             // Finaliza apenas as parcelas confirmadas (status_apto_pagar=1)
             $pendentes = DB::table('comissoes_corretores_lancadas as ccl')
                 ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+                ->leftJoin('contratos as ctc', 'c.contrato_id', '=', 'ctc.id')
+                ->leftJoin('contrato_empresarial as ctec', 'c.contrato_empresarial_id', '=', 'ctec.id')
+                // Cancelados (financeiro_id=12) nao entram na folha
+                ->where(function ($q) {
+                    $q->whereNull('ctc.id')->orWhere('ctc.financeiro_id', '!=', 12);
+                })
+                ->where(function ($q) {
+                    $q->whereNull('ctec.id')->orWhere('ctec.financeiro_id', '!=', 12);
+                })
+                    ->where(fn($q2) => $q2->whereNotNull("ctc.id")->orWhereNotNull("ctec.id"))
                 ->where('c.user_id', $parceiroId)
                 ->where('ccl.status_financeiro', 1)
                 ->where('ccl.status_gerente', 1)
@@ -392,7 +420,18 @@ class FolhaAmerica extends Controller
                 ->where('pago', 0)
                 ->sum('valor');
 
-            $totalFinal = $pendentes->sum('valor') + $totalOdonto - $totalValeFinalizacao;
+            // Estornos pendentes do parceiro: descontam UMA unica vez nesta folha
+            $estornoContratos = DB::table('contratos')
+                ->join('clientes', 'clientes.id', '=', 'contratos.cliente_id')
+                ->where('clientes.user_id', $parceiroId)
+                ->where('contratos.estorno', 1)
+                ->whereNotNull('contratos.valor_estorno')
+                ->whereNull('contratos.data_baixa_estorno')
+                ->pluck('contratos.valor_estorno', 'contratos.id');
+
+            $totalEstorno = (float) collect($estornoContratos)->sum();
+
+            $totalFinal = $pendentes->sum('valor') + $totalOdonto - $totalValeFinalizacao - $totalEstorno;
 
             // Cria registro histÃ³rico com snapshot
             $historicoId = DB::table('parceiros_folha_historico')->insertGetId([
@@ -406,6 +445,7 @@ class FolhaAmerica extends Controller
                 'total_valor'     => $totalFinal,
                 'total_odonto'    => $totalOdonto,
                 'total_vale'      => $totalValeFinalizacao,
+                'total_estorno'   => $totalEstorno,
                 'odonto_snapshot' => json_encode($odontoSnapshot),
                 'created_at'      => now(),
                 'updated_at'      => now(),
@@ -421,6 +461,26 @@ class FolhaAmerica extends Controller
                     'parceiro_historico_id'    => $historicoId,
                     'updated_at'               => now(),
                 ]);
+
+            // Baixa os estornos descontados nesta folha (nunca descontam de novo)
+            if ($estornoContratos->isNotEmpty()) {
+                DB::table('contratos')
+                    ->whereIn('id', $estornoContratos->keys())
+                    ->update([
+                        'data_baixa_estorno' => $hoje,
+                        'updated_at' => now(),
+                    ]);
+
+                DB::table('estornos')
+                    ->whereIn('contrato_id', $estornoContratos->keys())
+                    ->where('status', 'pendente')
+                    ->update([
+                        'status' => 'aplicado',
+                        'data_aplicacao' => now(),
+                        'folha_referencia' => 'Folha Parceiro #' . $historicoId . ' (' . $periodoInicio . ' a ' . $periodoFim . ')',
+                        'updated_at' => now(),
+                    ]);
+            }
 
             // Marca vale como pago
             DB::table('vale')
@@ -441,7 +501,8 @@ class FolhaAmerica extends Controller
                 'success'        => true,
                 'message'        => "Folha de {$parceiro->name} finalizada. PerÃ­odo: {$periodoInicio} a {$periodoFim}.",
                 'total_parcelas' => $pendentes->count(),
-                'total_valor'    => number_format($pendentes->sum('valor'), 2, ',', '.'),
+                'total_valor'    => number_format($totalFinal, 2, ',', '.'),
+                'total_estorno'  => number_format($totalEstorno, 2, ',', '.'),
                 'historico_id'   => $historicoId,
             ]);
         } catch (\Exception $e) {
@@ -571,6 +632,7 @@ class FolhaAmerica extends Controller
         // Planos Individual e Coletivo
         if ($planoId == 1 || $planoId == 3) {
             $query->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
                 ->join('clientes as cl', 'ct.cliente_id', '=', 'cl.id')
                 ->join("users as u","u.id","=","cl.user_id")
                 ->join(DB::raw('administradoras'), 'administradoras.id', '=', 'ct.administradora_id')
@@ -625,6 +687,7 @@ class FolhaAmerica extends Controller
         elseif ($planoId == 'empresarial') {
             $query
                 ->join('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
+                ->where('ce.financeiro_id', '!=', 12)
                 ->join("users as u","u.id","=","ce.user_id")
                 ->select(
                     'ce.razao_social as cliente_nome',
@@ -640,14 +703,18 @@ class FolhaAmerica extends Controller
                 );
         }
 
-        // Planos Estorno
+        // Planos Estorno: consulta independente das parcelas (o estorno existe mesmo
+        // quando o contrato nao tem mais parcela aberta, ex. comissao ja paga)
         elseif ($planoId == 'estorno') {
-            $query->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+            $clientes = DB::table('contratos as ct')
                 ->join('clientes as cl', 'ct.cliente_id', '=', 'cl.id')
-                ->join('users','users.id',"=","cl.user_id")
-                ->join(DB::raw('administradoras'), 'administradoras.id', '=', 'ct.administradora_id')
+                ->join('users', 'users.id', '=', 'cl.user_id')
+                ->join('administradoras', 'administradoras.id', '=', 'ct.administradora_id')
+                ->where('users.corretora_id', auth()->user()->corretora_id)
                 ->where('ct.estorno', 1)
                 ->whereNotNull('ct.valor_estorno')
+                ->where('ct.valor_estorno', '>', 0)
+                ->whereNull('ct.data_baixa_estorno')
                 ->select(
                     'cl.nome as cliente_nome',
                     'users.name as corretor',
@@ -655,10 +722,19 @@ class FolhaAmerica extends Controller
                     'ct.codigo_externo as contrato_codigo',
                     'ct.valor_estorno as valor_comissao',
                     'ct.valor_plano as valor_original_plano',
-                    'ccl.parcela',
-                    'ccl.data as vencimento',
+                    DB::raw('NULL as parcela'),
+                    DB::raw('NULL as vencimento'),
                     'ct.created_at as data_cadastro'
-                );
+                )
+                ->orderBy('users.name')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'clientes' => $clientes,
+                'frase' => "Clientes do Plano",
+                'total' => $clientes->sum('valor_comissao'),
+            ]);
         }
 
         // Executa a consulta
@@ -745,6 +821,7 @@ class FolhaAmerica extends Controller
         if ($planoId == 1 || $planoId == 3) {
             // Para planos Individual (1) ou Coletivo (3)
             $query->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
                 ->join('clientes as cl', 'ct.cliente_id', '=', 'cl.id')
                 ->join(DB::raw('administradoras'), 'administradoras.id', '=', 'ct.administradora_id')
                 ->where('ct.plano_id', $planoId)
@@ -816,32 +893,49 @@ class FolhaAmerica extends Controller
                     ")
                 );
         } elseif($planoId == 'estorno') {
-            $query->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+            // Consulta independente das parcelas: o estorno deve aparecer mesmo quando
+            // o contrato nao tem mais parcela aberta (ex. comissao ja paga e cliente cancelado)
+            $clientes = DB::table('contratos as ct')
                 ->join('clientes as cl', 'ct.cliente_id', '=', 'cl.id')
-                ->join(DB::raw('administradoras'), 'administradoras.id', '=', 'ct.administradora_id')
+                ->join('administradoras', 'administradoras.id', '=', 'ct.administradora_id')
+                ->where('cl.user_id', $corretorId)
                 ->where('ct.estorno', 1)
                 ->whereNotNull('ct.valor_estorno')
+                ->where('ct.valor_estorno', '>', 0)
+                ->whereNull('ct.data_baixa_estorno')
                 ->select(
                     'cl.nome as cliente_nome',
                     'cl.cpf',
                     'ct.valor_estorno as valor_comissao',
                     'ct.codigo_externo as contrato_codigo',
                     'ct.valor_plano as valor_original_plano',
-
-                    DB::raw("
-                        CASE
-                            WHEN cl.desconto_operadora IS NOT NULL THEN
-                                ct.valor_plano - ((ct.valor_plano * cl.desconto_operadora) / 100)
-                            ELSE
-                                ct.valor_plano
-                        END as valor_plano_ajustado
-                    "),
+                    DB::raw('ct.valor_plano as valor_plano_ajustado'),
                     'ct.created_at as data_cadastro',
-                    'ccl.parcela',
+                    DB::raw('NULL as parcela'),
                     'administradoras.nome as administradora',
-                    'ccl.data AS vencimento',
+                    DB::raw('NULL as vencimento'),
                     DB::raw("'-' as porcentagem")
-                );
+                )
+                ->orderBy('cl.nome')
+                ->get();
+
+            $corretor = DB::table('users')
+                ->select('id', 'name', 'email')
+                ->where('id', $corretorId)
+                ->first();
+
+            return response()->json([
+                'success' => true,
+                'clientes' => $clientes,
+                'corretor' => $corretor,
+                'total' => $clientes->sum('valor_comissao'),
+                'tipo' => 'estorno',
+                'resumo' => $this->obterResumoPorPlanoCorretor($corretorId),
+                'odonto' => false,
+                'desconto' => false,
+                'frase' => "Estorno - " . ($corretor->name ?? ''),
+                'premiacao' => 0
+            ]);
         } elseif ($planoId == 'odonto') {
             // Para Odonto
             $resultadoOdonto = DB::table('odonto')
@@ -912,6 +1006,7 @@ class FolhaAmerica extends Controller
             $dados = DB::table('comissoes_corretores_lancadas as ccl')
                 ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
                 ->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
                 ->join('clientes as cl', 'ct.cliente_id', '=', 'cl.id')
                 ->join(DB::raw('administradoras'), 'administradoras.id', '=', 'ct.administradora_id')
                 ->select(
@@ -984,7 +1079,6 @@ class FolhaAmerica extends Controller
         ")
                 )
                 ->where('c.user_id', $corretorId)
-                ->where('ct.plano_id',1)
                 ->where('ccl.valor', '!=', 0) // Filtra onde valor > 0
                 ->where('ccl.finalizado', '!=', 1) // Exclui registros finalizados
                 ->where(function ($query) {
@@ -1000,7 +1094,50 @@ class FolhaAmerica extends Controller
 
                 ->get();
 
+            // Nao Recebido tambem inclui contratos EMPRESARIAIS (antes so individual)
+            $dadosEmp = DB::table('comissoes_corretores_lancadas as ccl')
+                ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+                ->join('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
+                ->where('ce.financeiro_id', '!=', 12)
+                ->select(
+                    DB::raw('ce.razao_social as cliente_nome'),
+                    DB::raw('ce.user_id as cliente_id'),
+                    DB::raw('ce.cnpj as cpf'),
+                    DB::raw('ce.plano_id as plano'),
+                    'ccl.valor as valor_comissao',
+                    'ccl.id as id',
+                    'ce.codigo_externo as contrato_codigo',
+                    'ce.valor_plano as valor_original_plano',
+                    DB::raw('ce.valor_plano as valor_plano_ajustado'),
+                    'ce.created_at as data_cadastro',
+                    'ccl.parcela',
+                    DB::raw("'Hapvida' as administradora"),
+                    'ccl.data as vencimento',
+                    DB::raw("COALESCE(ccl.porcentagem_paga, '-') as porcentagem"),
+                    DB::raw("
+                        CASE
+                            WHEN ccl.status_financeiro = 1 AND ccl.status_gerente = 0 THEN 'cliente_pago'
+                            WHEN ccl.status_financeiro = 0 AND ccl.status_gerente = 1 THEN 'operadora_pagou'
+                            ELSE NULL
+                        END as resposta
+                    ")
+                )
+                ->where('c.user_id', $corretorId)
+                ->where('ccl.valor', '!=', 0)
+                ->where('ccl.finalizado', '!=', 1)
+                ->where(function ($query) {
+                    $query->where(function ($query) {
+                        $query->where('ccl.status_financeiro', 1)
+                            ->where('ccl.status_gerente', 0);
+                    })
+                        ->orWhere(function ($query) {
+                            $query->where('ccl.status_financeiro', 0)
+                                ->where('ccl.status_gerente', 1);
+                        });
+                })
+                ->get();
 
+            $dados = $dados->concat($dadosEmp)->sortBy('cliente_nome')->values();
 
             return response()->json([
                 'success' => true,
@@ -1013,6 +1150,7 @@ class FolhaAmerica extends Controller
         } else {
             // Para Plano Empresarial (apenas contrato_empresarial)
             $query->join('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
+                ->where('ce.financeiro_id', '!=', 12)
                 ->whereNotIn('ce.plano_id', [1, 3])
                 ->select(
                     'ce.razao_social as cliente_nome',  // Usando razao_social em vez de nome do cliente
@@ -1355,6 +1493,7 @@ class FolhaAmerica extends Controller
         $individual = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
             ->join('clientes as cl', 'ct.cliente_id', '=', 'cl.id')
             ->where('ct.plano_id', 1)
             ->where('c.user_id', $corretorId)
@@ -1377,6 +1516,7 @@ class FolhaAmerica extends Controller
         $adiantamento = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
             ->join('clientes as cl', 'cl.id', '=', 'ct.cliente_id') // Relacionando o cliente
             ->selectRaw('
         COUNT(DISTINCT ct.id) as total_contratos,
@@ -1393,11 +1533,37 @@ class FolhaAmerica extends Controller
                             ->where('ccl.status_gerente', 1);
                     });
             })
-            ->where('ct.plano_id', 1) // Apenas contratos do plano Individual
             ->where('c.user_id', $corretorId) // Associado ao corretor atual
             ->where('ccl.valor', '!=', 0) // Exclui registros com valor 0
             ->where('ccl.finalizado', '!=', 1) // Exclui finalizados
             ->first(); // Retorna apenas um registro agregado
+
+        // Nao Recebido tambem soma contratos EMPRESARIAIS (antes so individual)
+        $adiantamentoEmp = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->join('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
+            ->where('ce.financeiro_id', '!=', 12)
+            ->selectRaw('COUNT(DISTINCT ce.id) as total_contratos, SUM(ce.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
+            ->where(function ($query) {
+                $query->where(function ($query) {
+                    $query->where('ccl.status_financeiro', 1)
+                        ->where('ccl.status_gerente', 0);
+                })
+                    ->orWhere(function ($query) {
+                        $query->where('ccl.status_financeiro', 0)
+                            ->where('ccl.status_gerente', 1);
+                    });
+            })
+            ->where('c.user_id', $corretorId)
+            ->where('ccl.valor', '!=', 0)
+            ->where('ccl.finalizado', '!=', 1)
+            ->first();
+
+        if ($adiantamento) {
+            $adiantamento->total_contratos = ($adiantamento->total_contratos ?? 0) + ($adiantamentoEmp->total_contratos ?? 0);
+            $adiantamento->total_vidas     = ($adiantamento->total_vidas ?? 0) + ($adiantamentoEmp->total_vidas ?? 0);
+            $adiantamento->valor_total     = ($adiantamento->valor_total ?? 0) + ($adiantamentoEmp->valor_total ?? 0);
+        }
 
         return [
             'individual' => [
@@ -1433,6 +1599,7 @@ class FolhaAmerica extends Controller
         $individual = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
             ->join('clientes as cl', 'ct.cliente_id', '=', 'cl.id')
             ->selectRaw('COUNT(DISTINCT ct.id) as total_contratos, SUM(cl.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
             ->where('ct.plano_id', 1)
@@ -1447,6 +1614,7 @@ class FolhaAmerica extends Controller
         $coletivo = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
             ->join('clientes as cl', 'ct.cliente_id', '=', 'cl.id')
             ->selectRaw('COUNT(DISTINCT ct.id) as total_contratos, SUM(cl.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
             ->where('ct.plano_id', 3)
@@ -1461,6 +1629,7 @@ class FolhaAmerica extends Controller
         $empresarial = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->join('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
+                ->where('ce.financeiro_id', '!=', 12)
             ->selectRaw('COUNT(DISTINCT ce.id) as total_contratos, SUM(ce.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
             ->whereNotIn('ce.plano_id', [1, 3])
             ->where('ccl.status_gerente', 1)
@@ -1614,6 +1783,7 @@ class FolhaAmerica extends Controller
             $parcelas = DB::table('comissoes_corretores_lancadas as ccl')
                 ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
                 ->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
                 ->where('ct.cliente_id', $clienteId)
                 ->select(
                     'ccl.parcela',
@@ -1716,6 +1886,7 @@ class FolhaAmerica extends Controller
         $individual = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
             ->join('clientes as cc','cc.id','=','ct.cliente_id')
             ->selectRaw('COUNT(DISTINCT ct.id) as total_contratos, SUM(cc.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
             ->where('ct.plano_id', 1)
@@ -1734,6 +1905,7 @@ class FolhaAmerica extends Controller
         $coletivo = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
             ->join('clientes as cc','cc.id','=','ct.cliente_id')
             ->selectRaw('COUNT(DISTINCT ct.id) as total_contratos, SUM(cc.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
             ->where('ct.plano_id', 3)
@@ -1752,6 +1924,7 @@ class FolhaAmerica extends Controller
         $empresarial = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->join('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
+                ->where('ce.financeiro_id', '!=', 12)
             ->selectRaw('COUNT(DISTINCT ce.id) as total_contratos, SUM(ce.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
             ->whereNotIn('ce.plano_id', [1, 3])
             ->where('c.user_id', $corretorId)
@@ -1768,6 +1941,7 @@ class FolhaAmerica extends Controller
         $adiantamento = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
             ->join('clientes as cl', 'cl.id', '=', 'ct.cliente_id') // Relacionando o cliente
             ->selectRaw('
         COUNT(DISTINCT ct.id) as total_contratos,
@@ -1784,11 +1958,37 @@ class FolhaAmerica extends Controller
                             ->where('ccl.status_gerente', 1);
                     });
             })
-            ->where('ct.plano_id', 1) // Apenas contratos do plano Individual
             ->where('c.user_id', $corretorId) // Associado ao corretor atual
             ->where('ccl.valor', '!=', 0) // Exclui registros com valor 0
             ->where('ccl.finalizado', '!=', 1) // Exclui finalizados
             ->first(); // Retorna apenas um registro agregado
+
+        // Nao Recebido tambem soma contratos EMPRESARIAIS (antes so individual)
+        $adiantamentoEmp = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->join('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
+            ->where('ce.financeiro_id', '!=', 12)
+            ->selectRaw('COUNT(DISTINCT ce.id) as total_contratos, SUM(ce.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
+            ->where(function ($query) {
+                $query->where(function ($query) {
+                    $query->where('ccl.status_financeiro', 1)
+                        ->where('ccl.status_gerente', 0);
+                })
+                    ->orWhere(function ($query) {
+                        $query->where('ccl.status_financeiro', 0)
+                            ->where('ccl.status_gerente', 1);
+                    });
+            })
+            ->where('c.user_id', $corretorId)
+            ->where('ccl.valor', '!=', 0)
+            ->where('ccl.finalizado', '!=', 1)
+            ->first();
+
+        if ($adiantamento) {
+            $adiantamento->total_contratos = ($adiantamento->total_contratos ?? 0) + ($adiantamentoEmp->total_contratos ?? 0);
+            $adiantamento->total_vidas     = ($adiantamento->total_vidas ?? 0) + ($adiantamentoEmp->total_vidas ?? 0);
+            $adiantamento->valor_total     = ($adiantamento->valor_total ?? 0) + ($adiantamentoEmp->valor_total ?? 0);
+        }
 
 
 
@@ -1824,6 +2024,7 @@ class FolhaAmerica extends Controller
         $query = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
             ->join('clientes as cl', 'ct.cliente_id', '=', 'cl.id')
             ->select('cl.nome as cliente_nome', 'cl.cpf', 'ccl.valor as valor_comissao', 'ct.codigo_externo as contrato_codigo', 'ccl.parcela')
             ->where('c.user_id', $corretorId)
@@ -1838,6 +2039,7 @@ class FolhaAmerica extends Controller
             $query->where('ct.plano_id', 3); // Coletivo
         } elseif ($planoId == 'empresarial') {
             $query->join('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
+                ->where('ce.financeiro_id', '!=', 12)
                 ->whereNotIn('ce.plano_id', [1, 3]);
         } else {
             $query->where('ct.plano_id', 1); // Individual
@@ -1905,6 +2107,16 @@ class FolhaAmerica extends Controller
                 // CLT/PJ: logica original com folha=1
                 $comissoesPendentes = DB::table('comissoes_corretores_lancadas as ccl')
                     ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+                    ->leftJoin('contratos as ctc', 'c.contrato_id', '=', 'ctc.id')
+                    ->leftJoin('contrato_empresarial as ctec', 'c.contrato_empresarial_id', '=', 'ctec.id')
+                    // Cancelados (financeiro_id=12) nao entram na folha
+                    ->where(function ($q) {
+                        $q->whereNull('ctc.id')->orWhere('ctc.financeiro_id', '!=', 12);
+                    })
+                    ->where(function ($q) {
+                        $q->whereNull('ctec.id')->orWhere('ctec.financeiro_id', '!=', 12);
+                    })
+                        ->where(fn($q2) => $q2->whereNotNull("ctc.id")->orWhereNotNull("ctec.id"))
                     ->where('c.user_id', $corretorId)
                     ->where('ccl.status_gerente', 1)
                     ->where('ccl.status_financeiro', 1)
@@ -2124,6 +2336,16 @@ class FolhaAmerica extends Controller
                 // CLT/PJ: logica original com folha=1
                 $comissoesPendentes = DB::table('comissoes_corretores_lancadas as ccl')
                     ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+                    ->leftJoin('contratos as ctc', 'c.contrato_id', '=', 'ctc.id')
+                    ->leftJoin('contrato_empresarial as ctec', 'c.contrato_empresarial_id', '=', 'ctec.id')
+                    // Cancelados (financeiro_id=12) nao entram na folha
+                    ->where(function ($q) {
+                        $q->whereNull('ctc.id')->orWhere('ctc.financeiro_id', '!=', 12);
+                    })
+                    ->where(function ($q) {
+                        $q->whereNull('ctec.id')->orWhere('ctec.financeiro_id', '!=', 12);
+                    })
+                        ->where(fn($q2) => $q2->whereNotNull("ctc.id")->orWhereNotNull("ctec.id"))
                     ->where('c.user_id', $corretorId)
                     ->where('ccl.status_gerente', 1)
                     ->where('ccl.status_financeiro', 1)
@@ -2335,13 +2557,20 @@ class FolhaAmerica extends Controller
 
             // 2. Processar cada corretor
             foreach ($corretoresSelecionados as $corretorId) {
-                // Aplicar faixa CLT antes de finalizar (recalcula valor com base no desempenho do mÃªs)
-                $this->aplicarFaixaCltVendedor($corretorId, $competencia);
-                $this->aplicarRegraParceiro($corretorId, $competencia);
 
                 // 2.1 Atualizar parcelas (baixas)
                 $comissoesPendentes = DB::table('comissoes_corretores_lancadas as ccl')
                     ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+                    ->leftJoin('contratos as ctc', 'c.contrato_id', '=', 'ctc.id')
+                    ->leftJoin('contrato_empresarial as ctec', 'c.contrato_empresarial_id', '=', 'ctec.id')
+                    // Cancelados (financeiro_id=12) nao entram na folha
+                    ->where(function ($q) {
+                        $q->whereNull('ctc.id')->orWhere('ctc.financeiro_id', '!=', 12);
+                    })
+                    ->where(function ($q) {
+                        $q->whereNull('ctec.id')->orWhere('ctec.financeiro_id', '!=', 12);
+                    })
+                        ->where(fn($q2) => $q2->whereNotNull("ctc.id")->orWhereNotNull("ctec.id"))
                     ->where('c.user_id', $corretorId)
                     ->where('c.corretora_id', $corretoraId)
                     ->where('ccl.status_gerente', 1)
@@ -2419,6 +2648,34 @@ class FolhaAmerica extends Controller
                             'updated_at' => $dataProcessamento,
                         ]);
                 }
+
+                // 2.4 Baixar estornos descontados nesta folha (cada estorno desconta UMA unica vez)
+                $estornoContratos = DB::table('contratos')
+                    ->join('clientes', 'clientes.id', '=', 'contratos.cliente_id')
+                    ->where('clientes.user_id', $corretorId)
+                    ->where('contratos.estorno', 1)
+                    ->whereNotNull('contratos.valor_estorno')
+                    ->whereNull('contratos.data_baixa_estorno')
+                    ->pluck('contratos.id');
+
+                if ($estornoContratos->isNotEmpty()) {
+                    DB::table('contratos')
+                        ->whereIn('id', $estornoContratos)
+                        ->update([
+                            'data_baixa_estorno' => $dataProcessamento,
+                            'updated_at' => now(),
+                        ]);
+
+                    DB::table('estornos')
+                        ->whereIn('contrato_id', $estornoContratos)
+                        ->where('status', 'pendente')
+                        ->update([
+                            'status' => 'aplicado',
+                            'data_aplicacao' => now(),
+                            'folha_referencia' => 'Folha CLT/PJ ' . Carbon::parse($folhaMes->mes)->format('m/Y'),
+                            'updated_at' => now(),
+                        ]);
+                }
             }
 
             // 3. Reativar parcelas desmarcadas (folha=0) para aparecerem na próxima folha
@@ -2486,6 +2743,8 @@ class FolhaAmerica extends Controller
             $corretores = DB::table('comissoes_corretores_lancadas as ccl')
                 ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
                 ->join('users as u', 'c.user_id', '=', 'u.id')
+                ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->leftJoin('contrato_empresarial as cte', 'c.contrato_empresarial_id', '=', 'cte.id')
                 ->where('c.corretora_id', $corretoraId)
                 ->where('ccl.finalizado', 1)
                 ->where('ccl.data_baixa_gerente_folha', $mes)
@@ -2494,7 +2753,8 @@ class FolhaAmerica extends Controller
                     u.name,
                     u.tipo_contrato,
                     COUNT(ccl.id)   AS total_parcelas,
-                    SUM(ccl.valor)  AS total_comissao
+                    SUM(ccl.valor)  AS total_comissao,
+                    SUM(COALESCE(ct.desconto_corretor, cte.desconto_corretor, 0)) AS total_desconto
                 ')
                 ->groupBy('u.id', 'u.name', 'u.tipo_contrato')
                 ->orderBy('u.name')
@@ -2513,10 +2773,11 @@ class FolhaAmerica extends Controller
 
             $corretores = $corretores->map(function ($c) use ($extras) {
                 $e = $extras[$c->id] ?? null;
-                $c->premiacao     = (float) ($e->premiacao ?? 0);
-                $c->fixo          = (float) ($e->fixo ?? 0);
-                $c->vale          = (float) ($e->vale ?? 0);
-                $c->total_liquido = (float) $c->total_comissao + $c->premiacao - $c->fixo - $c->vale;
+                $c->premiacao      = (float) ($e->premiacao ?? 0);
+                $c->fixo           = (float) ($e->fixo ?? 0);
+                $c->vale           = (float) ($e->vale ?? 0);
+                $c->total_desconto = (float) ($c->total_desconto ?? 0);
+                $c->total_liquido  = (float) $c->total_comissao + $c->premiacao - $c->fixo - $c->vale - $c->total_desconto;
                 return $c;
             });
 
@@ -2528,6 +2789,7 @@ class FolhaAmerica extends Controller
                 'total_corretores' => $corretores->count(),
                 'total_parcelas'   => $corretores->sum('total_parcelas'),
                 'total_bruto'      => $corretores->sum('total_comissao'),
+                'total_desconto'   => $corretores->sum('total_desconto'),
                 'total_liquido'    => $corretores->sum('total_liquido'),
             ];
         });
@@ -2732,12 +2994,15 @@ class FolhaAmerica extends Controller
 
         if ($plano_id && $plano_id == 3) {
             $query->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
                 ->where('ct.plano_id', 3);
         } elseif ($plano_id &&  $plano_id == 'empresarial') {
             $query->join('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
+                ->where('ce.financeiro_id', '!=', 12)
                 ->whereNotIn('ce.plano_id', [1, 3]);
         } elseif($plano_id && $plano_id == 1) {
             $query->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->where('ct.financeiro_id', '!=', 12)
                 ->where('ct.plano_id', $plano_id);
         }
 
@@ -2987,7 +3252,7 @@ class FolhaAmerica extends Controller
             SELECT contratos.id as id_estorno, clientes.user_id, SUM(contratos.valor_estorno) as valor_estorno_total
             FROM contratos
             INNER JOIN clientes ON clientes.id = contratos.cliente_id
-            WHERE contratos.estorno = 1 AND contratos.valor_estorno IS NOT NULL
+            WHERE contratos.estorno = 1 AND contratos.valor_estorno IS NOT NULL AND contratos.data_baixa_estorno IS NULL
             GROUP BY clientes.user_id, contratos.id
         ) as est'), 'u.id', '=', 'est.user_id')
 
@@ -3039,7 +3304,6 @@ class FolhaAmerica extends Controller
                     - COALESCE(SUM(
                         CASE
                             WHEN ccl.status_financeiro = 1
-                            AND ccl.status_gerente = 1
                             AND ccl.finalizado != 1
                             AND ccl.folha = 1
                             AND ccl.valor != 0
@@ -3050,7 +3314,6 @@ class FolhaAmerica extends Controller
                     - COALESCE(SUM(
                         CASE
                             WHEN ccl.status_financeiro = 1
-                            AND ccl.status_gerente = 1
                             AND ccl.finalizado != 1
                             AND ccl.folha = 1
                             AND ccl.valor != 0
@@ -3071,6 +3334,7 @@ class FolhaAmerica extends Controller
                       INNER JOIN contratos ON contratos.cliente_id = clientes.id
                       WHERE contratos.estorno = 1
                         AND contratos.valor_estorno IS NOT NULL
+                        AND contratos.data_baixa_estorno IS NULL
                         AND clientes.user_id = u.id
                      ) as total_estorno')
             ])
@@ -3083,7 +3347,6 @@ class FolhaAmerica extends Controller
             ->leftJoin('comissoes_corretores_lancadas as ccl', function ($join) {
                 $join->on('c.id', '=', 'ccl.comissoes_id')
                     ->where('ccl.status_financeiro', 1)
-                    ->where('ccl.status_gerente', 1)
                     ->where('ccl.finalizado', '!=', 1)
                     ->where('ccl.folha', 1)
                     ->where('ccl.valor', '!=', 0);
@@ -3091,7 +3354,21 @@ class FolhaAmerica extends Controller
             ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
             ->leftJoin('contrato_empresarial as cte', 'c.contrato_empresarial_id', '=', 'cte.id')
             ->leftJoin('clientes as cc', 'cc.id', '=', 'ct.cliente_id')
-            ->where('u.corretora_id', $this->corretora_id);
+            ->where('u.corretora_id', $this->corretora_id)
+            // Contratos cancelados (financeiro_id=12) nao entram na folha
+            ->where(function ($q) {
+                $q->whereNull('ct.id')->orWhere('ct.financeiro_id', '!=', 12);
+            })
+            ->where(function ($q) {
+                $q->whereNull('cte.id')->orWhere('cte.financeiro_id', '!=', 12);
+            })
+            // Comissoes ORFAS (contrato_id apontando para contrato inexistente —
+            // lixo do sistema antigo) nao entram no total do corretor
+            ->where(function ($q) {
+                $q->whereNull('c.id')
+                  ->orWhereNotNull('ct.id')
+                  ->orWhereNotNull('cte.id');
+            });
 
         // Filtro por tipo de contrato
         if ($tipoContrato === 'parceiro') {
@@ -3139,6 +3416,7 @@ class FolhaAmerica extends Controller
                         INNER JOIN clientes ON clientes.id = contratos.cliente_id
                         WHERE contratos.estorno = 1
                           AND contratos.valor_estorno IS NOT NULL
+                          AND contratos.data_baixa_estorno IS NULL
                           AND clientes.user_id = u.id
                     ), 0)
                     - COALESCE(SUM(ct.desconto_corretor), 0)
@@ -3154,6 +3432,7 @@ class FolhaAmerica extends Controller
                       INNER JOIN contratos ON contratos.cliente_id = clientes.id
                       WHERE contratos.estorno = 1
                         AND contratos.valor_estorno IS NOT NULL
+                        AND contratos.data_baixa_estorno IS NULL
                         AND clientes.user_id = u.id
                      ) as total_estorno')
             ])
@@ -3253,6 +3532,7 @@ class FolhaAmerica extends Controller
                         INNER JOIN clientes ON clientes.id = contratos.cliente_id
                         WHERE contratos.estorno = 1
                           AND contratos.valor_estorno IS NOT NULL
+                          AND contratos.data_baixa_estorno IS NULL
                           AND clientes.user_id = u.id
                     ), 0)
                 ) as total_receber
@@ -3266,6 +3546,7 @@ class FolhaAmerica extends Controller
                       INNER JOIN contratos ON contratos.cliente_id = clientes.id
                       WHERE contratos.estorno = 1
                         AND contratos.valor_estorno IS NOT NULL
+                        AND contratos.data_baixa_estorno IS NULL
                         AND clientes.user_id = u.id
                      ) as total_estorno')
             ])
@@ -3285,7 +3566,6 @@ class FolhaAmerica extends Controller
 
         // Filtros
         $query->where('c.corretora_id', $this->corretora_id)
-            ->where('ccl.status_gerente', 1)
             ->where('ccl.status_financeiro', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->where('ccl.valor', '!=', 0);
@@ -3491,28 +3771,29 @@ class FolhaAmerica extends Controller
 
     // ==================== CÃLCULO FAIXAS CLT ====================
 
-    private function aplicarFaixaCltVendedor(int $corretorId, string $competencia): void
+    private function aplicarFaixaCltVendedor(int $corretorId, string $competencia, bool $exigirGerente = true): ?array
     {
         $user = DB::table('users')->where('id', $corretorId)->select('tipo_contrato')->first();
 
         if (!$user || $user->tipo_contrato !== 'clt') {
-            return;
+            return null;
         }
 
         // ComissÃµes pendentes do vendedor nesta competÃªncia
         $comissoes = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
             ->where('c.user_id', $corretorId)
-            ->where('ccl.status_gerente', 1)
+            ->when($exigirGerente, fn($q) => $q->where('ccl.status_gerente', 1))
             ->where('ccl.status_financeiro', 1)
             ->where('ccl.competencia', $competencia)
             ->where('ccl.finalizado', '!=', 1)
             ->whereNull('ccl.data_baixa_gerente_folha')
-            ->select('ccl.id', 'ccl.comissoes_id', 'ccl.valor_pago')
+            ->select('ccl.id', 'ccl.comissoes_id', 'ccl.valor_pago', 'ct.valor_plano')
             ->get();
 
         if ($comissoes->isEmpty()) {
-            return;
+            return null;
         }
 
         // Vidas = contratos Ãºnicos com baixa nesta competÃªncia
@@ -3531,7 +3812,7 @@ class FolhaAmerica extends Controller
             ->first();
 
         if (!$faixa) {
-            return;
+            return null;
         }
 
         // Determinar o percentual: base ou bÃ´nus (se produÃ§Ã£o atingiu o limiar)
@@ -3541,18 +3822,83 @@ class FolhaAmerica extends Controller
         }
 
         // Recalcular valor de cada comissÃ£o com o percentual apurado
+        // Base = SEMPRE o valor_plano do contrato (mensalidade, sem taxa de adesÃ£o)
+        $recalculadas = 0;
         foreach ($comissoes as $ccl) {
-            if (!$ccl->valor_pago) {
+            $base = (float) ($ccl->valor_plano ?: (($ccl->valor_pago ?: 0) - 35));
+            if ($base <= 0) {
                 continue;
             }
 
-            $base      = (float) $ccl->valor_pago - 35;
             $novoValor = max(0, $base * $percentual / 100);
 
             DB::table('comissoes_corretores_lancadas')
                 ->where('id', $ccl->id)
-                ->update(['valor' => $novoValor]);
+                ->update([
+                    'valor'            => $novoValor,
+                    'porcentagem_paga' => $percentual,
+                ]);
+            $recalculadas++;
         }
+
+        return [
+            'vidas'      => $vidas,
+            'faixa'      => $faixa->nome,
+            'percentual' => $percentual,
+            'parcelas'   => $recalculadas,
+        ];
+    }
+
+    public function recalcularComissoes(Request $request)
+    {
+        $corretores = DB::table('users')
+            ->where('corretora_id', $this->corretora_id)
+            ->pluck('name', 'id');
+
+        // A backoffice escolhe QUAIS competencias recalcular (modal com o mes da
+        // folha aberta + 6 meses anteriores). Sem selecao, usa a folha aberta.
+        // Obs.: recalcular um mes antigo reaplica as faixas — inclusive sobre
+        // parcelas zeradas em 2026-09-05 — de forma intencional e controlada.
+        $selecionadas = collect($request->input('competencias', []))
+            ->filter(fn($c) => is_string($c) && preg_match('/^\d{4}-\d{2}$/', $c))
+            ->unique()
+            ->take(12)
+            ->values();
+
+        if ($selecionadas->isNotEmpty()) {
+            $competencias = $selecionadas;
+        } else {
+            $folhaAberta = DB::table('folha_mes')
+                ->where('corretora_id', $this->corretora_id)
+                ->where('status', 0)
+                ->orderByDesc('mes')
+                ->value('mes');
+
+            $competencias = $folhaAberta
+                ? collect([Carbon::parse($folhaAberta)->format('Y-m')])
+                : collect();
+        }
+
+        $resultados = [];
+        foreach ($competencias as $competencia) {
+            foreach ($corretores as $corretorId => $nome) {
+                $info = $this->aplicarFaixaCltVendedor($corretorId, $competencia, false);
+                $this->aplicarRegraParceiro($corretorId, $competencia);
+
+                if ($info) {
+                    $resultados[] = array_merge(
+                        ['competencia' => $competencia, 'vendedor' => $nome],
+                        $info
+                    );
+                }
+            }
+        }
+
+        return response()->json([
+            'success'      => true,
+            'competencias' => $competencias,
+            'recalculados' => $resultados,
+        ]);
     }
 
     // ==================== FAIXAS CLT (CRUD) ====================
@@ -3657,9 +4003,12 @@ class FolhaAmerica extends Controller
         $request->validate([
             'vidas_min'     => 'required|integer|min:0',
             'vidas_max'     => 'nullable|integer|gt:vidas_min',
+            'parcela_1_pct' => 'nullable|numeric|min:0|max:999',
             'parcela_2_pct' => 'required|numeric|min:0|max:999',
             'parcela_3_pct' => 'required|numeric|min:0|max:999',
             'parcela_4_pct' => 'required|numeric|min:0|max:999',
+            'parcela_5_pct' => 'nullable|numeric|min:0|max:999',
+            'parcela_6_pct' => 'nullable|numeric|min:0|max:999',
         ]);
 
         RegraComissaoPj::create([
@@ -3667,9 +4016,12 @@ class FolhaAmerica extends Controller
             'nome'          => '',
             'vidas_min'     => $request->vidas_min,
             'vidas_max'     => $request->vidas_max ?: null,
+            'parcela_1_pct' => $request->parcela_1_pct ?: 0,
             'parcela_2_pct' => $request->parcela_2_pct,
             'parcela_3_pct' => $request->parcela_3_pct,
             'parcela_4_pct' => $request->parcela_4_pct,
+            'parcela_5_pct' => $request->parcela_5_pct ?: 0,
+            'parcela_6_pct' => $request->parcela_6_pct ?: 0,
         ]);
 
         $this->renumerarRegrasPj();
@@ -3682,9 +4034,12 @@ class FolhaAmerica extends Controller
         $request->validate([
             'vidas_min'     => 'required|integer|min:0',
             'vidas_max'     => 'nullable|integer|gt:vidas_min',
+            'parcela_1_pct' => 'nullable|numeric|min:0|max:999',
             'parcela_2_pct' => 'required|numeric|min:0|max:999',
             'parcela_3_pct' => 'required|numeric|min:0|max:999',
             'parcela_4_pct' => 'required|numeric|min:0|max:999',
+            'parcela_5_pct' => 'nullable|numeric|min:0|max:999',
+            'parcela_6_pct' => 'nullable|numeric|min:0|max:999',
         ]);
 
         RegraComissaoPj::where('id', $id)
@@ -3692,9 +4047,12 @@ class FolhaAmerica extends Controller
             ->update([
                 'vidas_min'     => $request->vidas_min,
                 'vidas_max'     => $request->vidas_max ?: null,
+                'parcela_1_pct' => $request->parcela_1_pct ?: 0,
                 'parcela_2_pct' => $request->parcela_2_pct,
                 'parcela_3_pct' => $request->parcela_3_pct,
                 'parcela_4_pct' => $request->parcela_4_pct,
+                'parcela_5_pct' => $request->parcela_5_pct ?: 0,
+                'parcela_6_pct' => $request->parcela_6_pct ?: 0,
             ]);
 
         $this->renumerarRegrasPj();
@@ -4023,6 +4381,201 @@ class FolhaAmerica extends Controller
 
     // ==================== COMISSÃƒO CORRETORA ====================
 
+    public function balancoCorretora(Request $request)
+    {
+        $mes = $request->input('mes') ?: now()->format('Y-m');
+        if (!preg_match('/^\d{4}-\d{2}$/', $mes)) {
+            $mes = now()->format('Y-m');
+        }
+
+        // ENTROU: comissao da corretora das parcelas confirmadas PELA OPERADORA no mes.
+        // Adiantamento manual da backoffice (manualmente=1) NAO e dinheiro recebido.
+        $entradaBase = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->join('users as u', 'u.id', '=', 'c.user_id')
+            ->where('c.corretora_id', $this->corretora_id)
+            ->where('ccl.status_gerente', 1)
+            ->where(function ($q) {
+                $q->whereNull('ccl.manualmente')->orWhere('ccl.manualmente', '!=', 1);
+            })
+            ->whereNotNull('ccl.valor_corretora')
+            ->where('ccl.valor_corretora', '>', 0)
+            ->whereRaw("DATE_FORMAT(COALESCE(ccl.data_baixa_gerente, ccl.data_baixa), '%Y-%m') = ?", [$mes]);
+
+        $entrou = (clone $entradaBase)
+            ->selectRaw('COUNT(*) qt, COALESCE(SUM(ccl.valor_corretora),0) total')
+            ->first();
+
+        // SAIU: comissoes de vendedores pagas (finalizadas) no mes
+        $saidaBase = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->join('users as u', 'u.id', '=', 'c.user_id')
+            ->leftJoin('parceiros_folha_historico as pfh', 'pfh.id', '=', 'ccl.parceiro_historico_id')
+            ->where('c.corretora_id', $this->corretora_id)
+            ->where('ccl.finalizado', 1)
+            ->where('ccl.valor', '>', 0)
+            ->whereRaw("DATE_FORMAT(COALESCE(ccl.data_baixa_gerente_folha, pfh.data_pagamento), '%Y-%m') = ?", [$mes]);
+
+        $saiu = (clone $saidaBase)
+            ->selectRaw('COUNT(*) qt, COALESCE(SUM(ccl.valor),0) total')
+            ->first();
+
+        // CONFIRMADAS PELA OPERADORA no mes: status_gerente=1 + data_baixa_gerente
+        // (via upload Parcelas/Adiantamento — exclui confirmacao manual da backoffice)
+        $confirmadasOperadora = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->where('c.corretora_id', $this->corretora_id)
+            ->where('ccl.status_gerente', 1)
+            ->whereNotNull('ccl.data_baixa_gerente')
+            ->where(function ($q) {
+                $q->whereNull('ccl.manualmente')->orWhere('ccl.manualmente', '!=', 1);
+            })
+            ->whereRaw("DATE_FORMAT(ccl.data_baixa_gerente, '%Y-%m') = ?", [$mes])
+            ->selectRaw('COUNT(*) qt, COALESCE(SUM(ccl.valor_corretora),0) total')
+            ->first();
+
+        // ADIANTADO MANUALMENTE ("paguei mas nao recebi"): cliente pagou
+        // (status_financeiro=1) e a backoffice confirmou na mao (manualmente=1),
+        // sem a operadora ter pago a corretora
+        $adiantadoManual = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->where('c.corretora_id', $this->corretora_id)
+            ->where('ccl.status_financeiro', 1)
+            ->where('ccl.manualmente', 1)
+            ->whereRaw("DATE_FORMAT(ccl.data_baixa_gerente, '%Y-%m') = ?", [$mes])
+            ->selectRaw('COUNT(*) qt, COALESCE(SUM(ccl.valor),0) total,
+                         COALESCE(SUM(CASE WHEN ccl.finalizado = 1 THEN ccl.valor ELSE 0 END),0) pago_vendedor')
+            ->first();
+
+        // A RECEBER DA OPERADORA (hoje): cliente pagou (sf=1) mas a operadora ainda
+        // nao pagou a corretora (sg=0, ou confirmado so manualmente pela backoffice)
+        $aReceber = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+            ->leftJoin('contrato_empresarial as cte', 'c.contrato_empresarial_id', '=', 'cte.id')
+            ->where('c.corretora_id', $this->corretora_id)
+            ->where('ccl.status_financeiro', 1)
+            ->where(function ($q) {
+                $q->where('ccl.status_gerente', 0)->orWhere('ccl.manualmente', 1);
+            })
+            ->where(function ($q) {
+                $q->whereNull('ct.id')->orWhere('ct.financeiro_id', '!=', 12);
+            })
+            ->where(function ($q) {
+                $q->whereNull('cte.id')->orWhere('cte.financeiro_id', '!=', 12);
+            })
+            ->selectRaw('COUNT(*) qt, COALESCE(SUM(ccl.valor_corretora),0) total')
+            ->first();
+
+        // A PAGAR AOS VENDEDORES (hoje): dupla confirmacao completa, ainda nao finalizada
+        $aPagar = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+            ->leftJoin('contrato_empresarial as cte', 'c.contrato_empresarial_id', '=', 'cte.id')
+            ->where('c.corretora_id', $this->corretora_id)
+            ->where('ccl.status_financeiro', 1)
+            ->where('ccl.status_gerente', 1)
+            ->where('ccl.finalizado', '!=', 1)
+            ->where('ccl.valor', '>', 0)
+            ->where(function ($q) {
+                $q->whereNull('ct.id')->orWhere('ct.financeiro_id', '!=', 12);
+            })
+            ->where(function ($q) {
+                $q->whereNull('cte.id')->orWhere('cte.financeiro_id', '!=', 12);
+            })
+            ->selectRaw('COUNT(*) qt, COALESCE(SUM(ccl.valor),0) total')
+            ->first();
+
+        // EVOLUCAO: entrou/saiu dos ultimos 6 meses (terminando no mes selecionado)
+        $mesesEvolucao = collect(range(5, 0))->map(fn($i) => \Carbon\Carbon::parse($mes . '-01')->subMonths($i)->format('Y-m'));
+        $evolucaoEntrada = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->where('c.corretora_id', $this->corretora_id)
+            ->where('ccl.status_gerente', 1)
+            ->where(function ($q) {
+                $q->whereNull('ccl.manualmente')->orWhere('ccl.manualmente', '!=', 1);
+            })
+            ->where('ccl.valor_corretora', '>', 0)
+            ->whereRaw("DATE_FORMAT(COALESCE(ccl.data_baixa_gerente, ccl.data_baixa), '%Y-%m') IN ('" . $mesesEvolucao->implode("','") . "')")
+            ->selectRaw("DATE_FORMAT(COALESCE(ccl.data_baixa_gerente, ccl.data_baixa), '%Y-%m') as m, SUM(ccl.valor_corretora) total")
+            ->groupBy('m')->pluck('total', 'm');
+        $evolucaoSaida = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->leftJoin('parceiros_folha_historico as pfh', 'pfh.id', '=', 'ccl.parceiro_historico_id')
+            ->where('c.corretora_id', $this->corretora_id)
+            ->where('ccl.finalizado', 1)
+            ->where('ccl.valor', '>', 0)
+            ->whereRaw("DATE_FORMAT(COALESCE(ccl.data_baixa_gerente_folha, pfh.data_pagamento), '%Y-%m') IN ('" . $mesesEvolucao->implode("','") . "')")
+            ->selectRaw("DATE_FORMAT(COALESCE(ccl.data_baixa_gerente_folha, pfh.data_pagamento), '%Y-%m') as m, SUM(ccl.valor) total")
+            ->groupBy('m')->pluck('total', 'm');
+        $evolucao = $mesesEvolucao->map(fn($m) => (object) [
+            'mes'    => $m,
+            'label'  => \Carbon\Carbon::parse($m . '-01')->locale('pt_BR')->translatedFormat('M/y'),
+            'entrou' => (float) ($evolucaoEntrada[$m] ?? 0),
+            'saiu'   => (float) ($evolucaoSaida[$m] ?? 0),
+        ]);
+
+        // ESTORNOS: aplicados no mes (descontados de folha) e pendentes (a descontar)
+        $estornoAplicado = DB::table('estornos')
+            ->where('status', 'aplicado')
+            ->whereNotNull('user_id')
+            ->whereRaw("DATE_FORMAT(data_aplicacao, '%Y-%m') = ?", [$mes])
+            ->selectRaw('COUNT(*) qt, COALESCE(SUM(valor),0) total')
+            ->first();
+        $estornoPendente = DB::table('estornos')
+            ->where('status', 'pendente')
+            ->whereNotNull('user_id')
+            ->selectRaw('COUNT(*) qt, COALESCE(SUM(valor),0) total')
+            ->first();
+
+        // Por semana do mes (1..6)
+        $entradaSemana = (clone $entradaBase)
+            ->selectRaw("FLOOR((DAY(COALESCE(ccl.data_baixa_gerente, ccl.data_baixa)) - 1) / 7) + 1 as semana, COUNT(*) qt, SUM(ccl.valor_corretora) total")
+            ->groupBy('semana')->pluck('total', 'semana');
+        $saidaSemana = (clone $saidaBase)
+            ->selectRaw("FLOOR((DAY(COALESCE(ccl.data_baixa_gerente_folha, pfh.data_pagamento)) - 1) / 7) + 1 as semana, COUNT(*) qt, SUM(ccl.valor) total")
+            ->groupBy('semana')->pluck('total', 'semana');
+
+        // Por vendedor
+        $entradaVendedor = (clone $entradaBase)
+            ->selectRaw('u.id, u.name, u.tipo_contrato, COUNT(*) qt, SUM(ccl.valor_corretora) total')
+            ->groupBy('u.id', 'u.name', 'u.tipo_contrato')->get()->keyBy('id');
+        $saidaVendedor = (clone $saidaBase)
+            ->selectRaw('u.id, u.name, u.tipo_contrato, COUNT(*) qt, SUM(ccl.valor) total')
+            ->groupBy('u.id', 'u.name', 'u.tipo_contrato')->get()->keyBy('id');
+
+        $vendedorIds = $entradaVendedor->keys()->merge($saidaVendedor->keys())->unique();
+        $porVendedor = $vendedorIds->map(function ($id) use ($entradaVendedor, $saidaVendedor) {
+            $e = $entradaVendedor[$id] ?? null;
+            $s = $saidaVendedor[$id] ?? null;
+            return (object) [
+                'name'          => $e->name ?? $s->name,
+                'tipo_contrato' => $e->tipo_contrato ?? $s->tipo_contrato,
+                'entrou'        => (float) ($e->total ?? 0),
+                'saiu'          => (float) ($s->total ?? 0),
+                'saldo'         => (float) ($e->total ?? 0) - (float) ($s->total ?? 0),
+            ];
+        })->sortByDesc('entrou')->values();
+
+        return view('folha.america.balanco-corretora', [
+            'mes'                  => $mes,
+            'mesFmt'               => \Carbon\Carbon::parse($mes . '-01')->locale('pt_BR')->translatedFormat('F/Y'),
+            'entrou'               => $entrou,
+            'saiu'                 => $saiu,
+            'saldo'                => (float) $entrou->total - (float) $saiu->total,
+            'entradaSemana'        => $entradaSemana,
+            'saidaSemana'          => $saidaSemana,
+            'porVendedor'          => $porVendedor,
+            'confirmadasOperadora' => $confirmadasOperadora,
+            'adiantadoManual'      => $adiantadoManual,
+            'estornoAplicado'      => $estornoAplicado,
+            'estornoPendente'      => $estornoPendente,
+            'aReceber'             => $aReceber,
+            'aPagar'               => $aPagar,
+            'evolucao'             => $evolucao,
+        ]);
+    }
+
     public function indexComissaoCorretora()
     {
         $configuracoes = ComissoesCorretoraConfiguracoes::with(['plano', 'administradora', 'user'])
@@ -4114,12 +4667,23 @@ class FolhaAmerica extends Controller
 
         DB::beginTransaction();
         try {
+            // apenas_vazios=1: preenche somente valor_corretora vazio (nao sobrescreve
+            // valores reais ja gravados pelas planilhas da operadora)
+            $apenasVazios = (bool) $request->input('apenas_vazios', false);
+
             $comissoes = DB::table('comissoes_corretores_lancadas as ccl')
                 ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+                ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->leftJoin('contrato_empresarial as cte', 'c.contrato_empresarial_id', '=', 'cte.id')
                 ->where('c.corretora_id', $this->corretora_id)
                 ->where('ccl.competencia', $competencia)
                 ->where('ccl.status_financeiro', 1)
-                ->select('ccl.id', 'ccl.comissoes_id', 'ccl.parcela', 'ccl.valor_pago', 'c.plano_id', 'c.administradora_id', 'c.user_id')
+                ->when($apenasVazios, fn($q) => $q->where(function ($w) {
+                    $w->whereNull('ccl.valor_corretora')->orWhere('ccl.valor_corretora', 0);
+                }))
+                ->select('ccl.id', 'ccl.comissoes_id', 'ccl.parcela', 'ccl.valor_pago',
+                         'c.plano_id', 'c.administradora_id', 'c.user_id',
+                         DB::raw('COALESCE(ct.valor_plano, cte.valor_plano) as valor_plano'))
                 ->get();
 
             $atualizados = 0;
@@ -4132,11 +4696,18 @@ class FolhaAmerica extends Controller
                     ->orderByRaw('user_id IS NULL ASC') // prefere config especÃ­fica do vendedor
                     ->first();
 
-                if (!$config || !$ccl->valor_pago) {
+                // Base de comissao: SEMPRE valor_plano do contrato;
+                // fallback (valor_pago - 35) so quando o contrato nao tem valor_plano
+                $base = (float) ($ccl->valor_plano ?: 0);
+                if ($base <= 0 && $ccl->valor_pago) {
+                    $base = (float) $ccl->valor_pago - 35;
+                }
+
+                if (!$config || $base <= 0) {
                     continue;
                 }
 
-                $valorCorretora = max(0, ((float) $ccl->valor_pago - 35) * (float) $config->valor / 100);
+                $valorCorretora = max(0, $base * (float) $config->valor / 100);
 
                 DB::table('comissoes_corretores_lancadas')
                     ->where('id', $ccl->id)
@@ -4264,15 +4835,19 @@ class FolhaAmerica extends Controller
 
         $now  = now();
         $rows = [];
-        foreach ($request->valores as $parcela => $valor) {
+        // Sempre grava as 6 parcelas (faltantes = 0%) e com administradora_id = 4
+        // (Hapvida) — todos os fluxos de cadastro consultam por administradora_id = 4
+        for ($parcela = 1; $parcela <= 6; $parcela++) {
+            $valor = $request->valores[$parcela] ?? 0;
             $rows[] = [
-                'corretora_id' => $this->corretora_id,
-                'plano_id'     => $planoId,
-                'user_id'      => $userId,
-                'parcela'      => (int) $parcela,
-                'valor'        => (float) $valor,
-                'created_at'   => $now,
-                'updated_at'   => $now,
+                'corretora_id'      => $this->corretora_id,
+                'plano_id'          => $planoId,
+                'administradora_id' => 4,
+                'user_id'           => $userId,
+                'parcela'           => $parcela,
+                'valor'             => (float) $valor,
+                'created_at'        => $now,
+                'updated_at'        => $now,
             ];
         }
 
@@ -4398,19 +4973,25 @@ class FolhaAmerica extends Controller
 
         $comissoes = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
             ->where('c.user_id', $parceiroId)
             ->where('ccl.status_financeiro', 1)
             ->where('ccl.status_gerente', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->whereNull('ccl.data_baixa_gerente_folha')
-            ->select('ccl.id', 'ccl.parcela', 'ccl.valor_pago', 'ccl.comissoes_id', 'c.plano_id')
+            ->select('ccl.id', 'ccl.parcela', 'ccl.valor_pago', 'ccl.comissoes_id', 'c.plano_id', 'ct.valor_plano')
             ->get();
 
         if ($comissoes->isEmpty()) return;
 
         foreach ($comissoes->groupBy('comissoes_id') as $comissaoId => $parcelas) {
             $planoId  = $parcelas->first()->plano_id;
-            $baseCalc = $parcelas->whereNotNull('valor_pago')->max('valor_pago') ?? 0;
+
+            // Base = SEMPRE o valor_plano do contrato (mensalidade, sem taxa de adesao)
+            $baseCalc = (float) ($parcelas->first()->valor_plano ?? 0);
+            if ($baseCalc <= 0) {
+                $baseCalc = (float) ($parcelas->whereNotNull('valor_pago')->max('valor_pago') ?? 0) - 35;
+            }
 
             $regra = ParceirosRegraComissao::where('corretora_id', $this->corretora_id)
                 ->where('parceiro_id', $parceiroId)
@@ -4421,17 +5002,28 @@ class FolhaAmerica extends Controller
 
             DB::table('comissoes_corretores_lancadas')
                 ->whereIn('id', $parcelas->pluck('id'))
-                ->update(['valor' => 0]);
+                ->update(['valor' => 0, 'porcentagem_paga' => null]);
 
             if ($baseCalc <= 0) continue;
 
-            foreach ([1 => $regra->parcela_1_pct, 2 => $regra->parcela_2_pct, 3 => $regra->parcela_3_pct, 4 => $regra->parcela_4_pct] as $num => $pct) {
+            $percentuais = [
+                1 => $regra->parcela_1_pct,
+                2 => $regra->parcela_2_pct,
+                3 => $regra->parcela_3_pct,
+                4 => $regra->parcela_4_pct,
+                5 => $regra->parcela_5_pct,
+                6 => $regra->parcela_6_pct,
+            ];
+            foreach ($percentuais as $num => $pct) {
                 if ((float) $pct <= 0) continue;
                 $p = $parcelas->firstWhere('parcela', $num);
                 if ($p) {
                     DB::table('comissoes_corretores_lancadas')
                         ->where('id', $p->id)
-                        ->update(['valor' => round($baseCalc * (float) $pct / 100, 2)]);
+                        ->update([
+                            'valor'            => round($baseCalc * (float) $pct / 100, 2),
+                            'porcentagem_paga' => (float) $pct,
+                        ]);
                 }
             }
         }

@@ -54,6 +54,24 @@
         .navbar ul li::after {position:absolute;content:'';left:20px;top:50%;transform: translateX(30px) translateY(-50%);opacity: 0;visibility: hidden;}
         .navbar ul li:hover::before,
         .navbar ul li:hover::after {transform: translateX(0px) translateY(-30%);opacity: 1;visibility: visible;transition: 0.15s ease-out;}
+        /* ===== Sidebar estilo Filament ===== */
+        .fsidebar {position:fixed;left:0;top:60px;bottom:0;width:240px;background:#18181b;border-right:1px solid rgba(255,255,255,0.08);overflow-y:auto;padding:14px 12px 24px;z-index:30;}
+        .fsidebar::-webkit-scrollbar {width:6px;}
+        .fsidebar::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.15);border-radius:3px;}
+        .fsidebar .fuser {display:flex;align-items:center;gap:10px;padding:4px 10px 14px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:10px;}
+        .fsidebar .fuser img {width:34px;height:34px;border-radius:50%;object-fit:cover;}
+        .fsidebar .fuser-name {color:#e4e4e7;font-size:13px;font-weight:600;line-height:1.2;margin:0;}
+        .fsidebar .fuser-role {color:#71717a;font-size:10.5px;margin:0;max-width:165px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .fsidebar .fgroup {margin-top:18px;}
+        .fsidebar .fgroup-label {font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#71717a;padding:0 10px;margin:0 0 5px 0;}
+        .fsidebar .fitem {display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:#a1a1aa;font-size:13px;font-weight:500;text-decoration:none;transition:background .15s,color .15s;margin-bottom:2px;}
+        .fsidebar .fitem svg {width:17px;height:17px;flex-shrink:0;}
+        .fsidebar .fitem:hover {background:rgba(255,255,255,0.06);color:#fff;}
+        .fsidebar .fitem.active {background:rgba(255,255,255,0.09);color:#fff;font-weight:600;}
+        .fsidebar .fitem.active svg {color:#60a5fa;}
+        @media (min-width:1024px) {
+            main.container_all {margin-left:240px;}
+        }
         main {flex: 1;}
         .ajax_load {display:none;position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;}
         .ajax_load_box{margin:auto;text-align:center;color:#fff;font-weight:var(700);text-shadow:1px 1px 1px rgba(0,0,0,.5)}
@@ -248,131 +266,147 @@
 
 
     <!-- Page Content -->
-    <div class="navbar hidden lg:block">
-        <div class="profile">
-            <div class="imgbox">
-                @if(auth()->user()->image)
-                    <img src="{{asset(auth()->user()->image)}}" alt="User">
-                @endif
-            </div>
+    <aside class="fsidebar hidden lg:block">
 
+        <div class="fuser">
+            @if(auth()->user()->image)
+                <img src="{{ asset(auth()->user()->image) }}" alt="User">
+            @else
+                <div style="width:34px;height:34px;border-radius:50%;background:#3f3f46;display:flex;align-items:center;justify-content:center;color:#a1a1aa;font-weight:700;font-size:14px;">
+                    {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                </div>
+            @endif
+            <div>
+                <p class="fuser-name">{{ auth()->user()->name }}</p>
+                <p class="fuser-role">{{ auth()->user()->email }}</p>
+            </div>
         </div>
 
-        <ul>
+        @php $isVendedor = (int) auth()->user()->cargo_id === 2; @endphp
 
+        @if($isVendedor)
+        <a href="{{ route('vendedor.clientes') }}" class="fitem {{ request()->routeIs('vendedor.clientes*') ? 'active' : '' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+            Meus Clientes
+        </a>
+        @else
+        <a href="{{ route('dashboard') }}" class="fitem {{ request()->routeIs('dashboard') || request()->routeIs('home.index') ? 'active' : '' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75"/></svg>
+            Dashboard
+        </a>
+        @endif
 
+        @if(auth()->user()->can('financeiro'))
+        <a href="{{ route('financeiro.index') }}" class="fitem {{ request()->routeIs('financeiro.*') ? 'active' : '' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z"/></svg>
+            Financeiro
+        </a>
+        @endif
 
+        <a href="{{ route('estrela.index') }}" class="fitem {{ request()->routeIs('estrela.*') ? 'active' : '' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z"/></svg>
+            Programa Estrela
+        </a>
 
+        @if(auth()->user()->can('comissao'))
 
+        <div class="fgroup">
+            <p class="fgroup-label">CLT</p>
+            <a href="{{ route('folha.america.faixas-clt') }}" class="fitem {{ request()->routeIs('folha.america.faixas-clt*') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+                Faixas de Comissão
+            </a>
+        </div>
 
+        <div class="fgroup">
+            <p class="fgroup-label">PJ</p>
+            <a href="{{ route('folha.america.regras-pj') }}" class="fitem {{ request()->routeIs('folha.america.regras-pj*') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/></svg>
+                Regras de Comissão
+            </a>
+            <a href="{{ route('folha.america.template-comissoes') }}" class="fitem {{ request()->routeIs('folha.america.template-comissoes*') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z"/></svg>
+                Templates de Comissão
+            </a>
+        </div>
 
+        <div class="fgroup">
+            <p class="fgroup-label">Parceiros</p>
+            <a href="{{ route('folha.america.parceiros.regras') }}" class="fitem {{ request()->routeIs('folha.america.parceiros.regras*') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/></svg>
+                Regras de Comissão
+            </a>
+            <a href="{{ route('folha.america.folha-parceiros') }}" class="fitem {{ request()->routeIs('folha.america.folha-parceiros') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+                Folha Parceiros
+            </a>
+            <a href="{{ route('folha.america.parceiros-config') }}" class="fitem {{ request()->routeIs('folha.america.parceiros-config*') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                Config. Pagamento
+            </a>
+            <a href="{{ route('folha.america.folha-parceiros.historico') }}" class="fitem {{ request()->routeIs('folha.america.folha-parceiros.historico') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                Histórico
+            </a>
+        </div>
 
+        <div class="fgroup">
+            <p class="fgroup-label">Folhas</p>
+            <a href="{{ route('folha.america.index') }}" class="fitem {{ request()->routeIs('folha.america.index') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
+                Folha CLT / PJ
+            </a>
+            <a href="{{ route('folha.america.historico') }}" class="fitem {{ request()->routeIs('folha.america.historico') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                Histórico de Folhas
+            </a>
+        </div>
 
+        <div class="fgroup">
+            <p class="fgroup-label">Corretora</p>
+            <a href="{{ route('folha.america.comissao-corretora.balanco') }}" class="fitem {{ request()->routeIs('folha.america.comissao-corretora.balanco') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941"/></svg>
+                Balanço da Corretora
+            </a>
+            <a href="{{ route('folha.america.comissao-corretora') }}" class="fitem {{ request()->routeIs('folha.america.comissao-corretora') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z"/></svg>
+                Comissão Corretora
+            </a>
+        </div>
 
+        @endif
 
-            <li text-data="dashboard" class="hover:text-black">
-                <a href="{{route('home.index')}}" class="flex items-center justify-center flex-col align-middle content-center hover:text-black">
-                    <svg class="w-4 h-4 text-gray-800 text-white hover:text-black flex align-middle" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path fill-rule="evenodd" d="M11.293 3.293a1 1 0 0 1 1.414 0l6 6 2 2a1 1 0 0 1-1.414 1.414L19 12.414V19a2 2 0 0 1-2 2h-3a1 1 0 0 1-1-1v-3h-2v3a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2v-6.586l-.293.293a1 1 0 0 1-1.414-1.414l2-2 6-6Z" clip-rule="evenodd"/>
-                    </svg>
-                    <span class="text-sm">dashboard</span>
-                </a>
-            </li>
-
-
-            <li text-data="estrela" class="hover:text-black">
-                <a href="{{route('estrela.index')}}" class="flex items-center justify-center flex-col align-middle content-center hover:text-black">
-                    <svg class="w-4 h-4 text-gray-800 text-white hover:text-black" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M13.849 4.22c-.684-1.626-3.014-1.626-3.698 0L8.397 8.387l-4.552.361c-1.775.14-2.495 2.331-1.142 3.477l3.468 2.937-1.06 4.392c-.413 1.713 1.472 3.067 2.992 2.149L12 19.35l3.897 2.354c1.52.918 3.405-.436 2.992-2.15l-1.06-4.39 3.468-2.938c1.353-1.146.633-3.336-1.142-3.477l-4.552-.36-1.754-4.17Z"/>
-                    </svg>
-                    <span class="text-sm">estrela</span>
-                </a>
-            </li>
-
-
-            @if(auth()->user()->can('financeiro'))
-            <li text-data="financeiro" class="hover:text-black">
-                <a href="{{route('financeiro.index')}}" class="flex items-center justify-center flex-col align-middle content-center hover:text-black">
-                    <svg class="w-4 h-4 text-gray-800 text-white hover:text-black" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path fill-rule="evenodd" d="M7 6a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-2v-4a3 3 0 0 0-3-3H7V6Z" clip-rule="evenodd"/>
-                        <path fill-rule="evenodd" d="M2 11a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7Zm7.5 1a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z" clip-rule="evenodd"/>
-                        <path d="M10.5 14.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/>
-                    </svg>
-                    <span class="text-sm">financeiro</span>
-                </a>
-            </li>
-            @endif
-
-                @if(auth()->user()->can('comissao'))
-            <li text-data="gerente">
-                <a href="{{route('folha.america.index')}}" class="flex items-center justify-center flex-col align-middle content-center hover:text-black">
-                    <svg class="w-4 h-4 text-gray-800 text-white hover:text-black" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24">
-                        <path fill="currentColor" fill-rule="evenodd" d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4Zm5.178 12.137a4.137 4.137 0 1 1 1.036-8.144A6.113 6.113 0 0 0 8.726 12c0 1.531.56 2.931 1.488 4.006a4.114 4.114 0 0 1-1.036.131ZM10.726 12c0-1.183.496-2.252 1.294-3.006A4.125 4.125 0 0 1 13.315 12a4.126 4.126 0 0 1-1.294 3.006A4.126 4.126 0 0 1 10.726 12Zm4.59 0a6.11 6.11 0 0 1-1.489 4.006 4.137 4.137 0 1 0 0-8.013A6.113 6.113 0 0 1 15.315 12Z" clip-rule="evenodd"/>
-                    </svg>
-                    <span class="text-sm">gerente</span>
-                </a>
-            </li>
-
-            <li text-data="Folha Parceiros">
-                <a href="{{route('folha.america.folha-parceiros')}}" class="flex items-center justify-center flex-col align-middle content-center hover:text-black">
-                    <svg class="w-4 h-4 text-white hover:text-black" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path fill-rule="evenodd" d="M8 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm-2 9a4 4 0 0 0-4 4v1a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-1a4 4 0 0 0-4-4H6Zm7.25-2.095c.478-.86.75-1.85.75-2.905a5.973 5.973 0 0 0-.75-2.906 4 4 0 1 1 0 5.811ZM15.466 20c.34-.588.535-1.271.535-2v-1a5.978 5.978 0 0 0-1.528-4H18a4 4 0 0 1 4 4v1a2 2 0 0 1-2 2h-4.535Z" clip-rule="evenodd"/>
-                    </svg>
-                    <span class="text-sm">Parceiros</span>
-                </a>
-            </li>
-             @endif
-
-
-
-
-
+        <div class="fgroup">
+            <p class="fgroup-label">{{ $isVendedor ? 'Conta' : 'Administração' }}</p>
             @if(auth()->user()->can('configuracoes'))
-
-            <li text-data="Corretores">
-                <a href="{{route('corretores.listar')}}" class="flex items-center justify-center flex-col align-middle content-center hover:text-black">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" class="w-4 h-4">
-                        <path fill-rule="evenodd" d="M8.25 6.75a3.75 3.75 0 1 1 7.5 0 3.75 3.75 0 0 1-7.5 0ZM15.75 9.75a3 3 0 1 1 6 0 3 3 0 0 1-6 0ZM2.25 9.75a3 3 0 1 1 6 0 3 3 0 0 1-6 0ZM6.31 15.117A6.745 6.745 0 0 1 12 12a6.745 6.745 0 0 1 6.709 7.498.75.75 0 0 1-.372.568A12.696 12.696 0 0 1 12 21.75c-2.305 0-4.47-.612-6.337-1.684a.75.75 0 0 1-.372-.568 6.787 6.787 0 0 1 1.019-4.38Z" clip-rule="evenodd" />
-                        <path d="M5.082 14.254a8.287 8.287 0 0 0-1.308 5.135 9.687 9.687 0 0 1-1.764-.44l-.115-.04a.563.563 0 0 1-.373-.487l-.01-.121a3.75 3.75 0 0 1 3.57-4.047ZM20.226 19.389a8.287 8.287 0 0 0-1.308-5.135 3.75 3.75 0 0 1 3.57 4.047l-.01.121a.563.563 0 0 1-.373.486l-.115.04c-.567.2-1.156.349-1.764.441Z" />
-                    </svg>
-                    <span class="text-sm">Corretores</span>
-                </a>
-            </li>
-
+            <a href="{{ route('corretores.listar') }}" class="fitem {{ request()->routeIs('corretores.*') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/></svg>
+                Corretores
+            </a>
             @endif
+            @unless($isVendedor)
+            <a href="{{ route('perfil.index') }}" class="fitem {{ request()->routeIs('perfil.*') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                Meu Perfil
+            </a>
+            @endunless
+            <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">
+                @csrf
+            </form>
+            <a href="#sair" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="fitem" style="color:#f87171;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"/></svg>
+                Sair
+            </a>
+        </div>
 
-
-
-
-            <li text-data="Editar Perfil" class="hover:text-black">
-                <a href="{{route('perfil.index')}}" class="flex items-center justify-center flex-col align-middle content-center hover:text-black">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" class="w-4 h-4">
-                        <path d="M21.731 2.269a2.625 2.625 0 0 0-3.712 0l-1.157 1.157 3.712 3.712 1.157-1.157a2.625 2.625 0 0 0 0-3.712ZM19.513 8.199l-3.712-3.712-12.15 12.15a5.25 5.25 0 0 0-1.32 2.214l-.8 2.685a.75.75 0 0 0 .933.933l2.685-.8a5.25 5.25 0 0 0 2.214-1.32L19.513 8.2Z" />
-                    </svg>
-                    <span class="text-sm">Perfil</span>
-                </a>
-            </li>
-
-            <li text-data="sair">
-                <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">
-                    @csrf
-                </form>
-                <a href="#sair" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="flex items-center justify-center flex-col align-middle content-center hover:text-black">
-                    <svg class="w-4 h-4 text-gray-800 text-white hover:text-black" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24">
-                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/>
-                    </svg>
-
-                    <span class="text-sm">Sair</span>
-                </a>
-            </li>
-
-        </ul>
-    </div>
+    </aside>
 
     <main class="container_all">
 
         @auth
-        <x-lembrete-parceiros />
+            @if((int) auth()->user()->cargo_id !== 2)
+                <x-lembrete-parceiros />
+            @endif
         @endauth
 
         {{ $slot }}

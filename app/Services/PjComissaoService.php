@@ -112,31 +112,42 @@ class PjComissaoService
             ->groupBy('comissoes_id');
 
         foreach ($todasParcelas as $comissaoId => $parcelas) {
-            // Base = maior valor_pago já confirmado, ou valor_plano do contrato
-            $base = $parcelas->max('valor_pago');
+            // Base = SEMPRE o valor_plano do contrato (mensalidade, sem taxa de adesão)
+            $base = (float) DB::table('comissoes as c')
+                ->join('contratos as ct', 'ct.id', '=', 'c.contrato_id')
+                ->where('c.id', $comissaoId)
+                ->value('ct.valor_plano');
             if (!$base || $base <= 0) {
-                $base = (float) DB::table('comissoes as c')
-                    ->join('contratos as ct', 'ct.id', '=', 'c.contrato_id')
-                    ->where('c.id', $comissaoId)
-                    ->value('ct.valor_plano');
+                $base = (float) $parcelas->max('valor_pago') - 35;
             }
             if (!$base || $base <= 0) continue;
 
-            // Zera parcelas 2-6
-            $idsP26 = $parcelas->whereIn('parcela', [2, 3, 4, 5, 6])->pluck('id');
-            if ($idsP26->isNotEmpty()) {
-                DB::table('comissoes_corretores_lancadas')->whereIn('id', $idsP26)->update(['valor' => 0]);
+            // Zera todas as parcelas (1-6) antes de aplicar a faixa
+            $idsTodas = $parcelas->whereIn('parcela', [1, 2, 3, 4, 5, 6])->pluck('id');
+            if ($idsTodas->isNotEmpty()) {
+                DB::table('comissoes_corretores_lancadas')->whereIn('id', $idsTodas)->update(['valor' => 0, 'porcentagem_paga' => null]);
             }
 
-            // Aplica percentuais da faixa nas parcelas 2, 3, 4
-            foreach ([2 => 'parcela_2_pct', 3 => 'parcela_3_pct', 4 => 'parcela_4_pct'] as $n => $campo) {
+            // Aplica percentuais da faixa nas parcelas 1 a 6
+            $campos = [
+                1 => 'parcela_1_pct',
+                2 => 'parcela_2_pct',
+                3 => 'parcela_3_pct',
+                4 => 'parcela_4_pct',
+                5 => 'parcela_5_pct',
+                6 => 'parcela_6_pct',
+            ];
+            foreach ($campos as $n => $campo) {
                 $pct = (float) ($regra->$campo ?? 0);
                 if ($pct <= 0) continue;
                 $p = $parcelas->firstWhere('parcela', $n);
                 if ($p) {
                     DB::table('comissoes_corretores_lancadas')
                         ->where('id', $p->id)
-                        ->update(['valor' => round($base * $pct / 100, 2)]);
+                        ->update([
+                            'valor'            => round($base * $pct / 100, 2),
+                            'porcentagem_paga' => $pct,
+                        ]);
                 }
             }
         }

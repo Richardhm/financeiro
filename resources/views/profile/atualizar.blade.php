@@ -1,4 +1,7 @@
 <x-app-layout>
+@section('css')
+    <link rel="stylesheet" href="{{ asset('css/estilo-financeiro.css') }}"/>
+@endsection
     <div class="flex flex-col items-center justify-center mt-6">
         <!-- Card de edição -->
         <div class="p-6 rounded-lg shadow-md w-[50%] bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px]">

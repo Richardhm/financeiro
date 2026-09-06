@@ -1,4 +1,7 @@
 <x-app-layout>
+@section('css')
+    <link rel="stylesheet" href="{{ asset('css/estilo-financeiro.css') }}"/>
+@endsection
     <div class="p-4 max-w-5xl mx-auto">
 
         {{-- Cabeçalho --}}

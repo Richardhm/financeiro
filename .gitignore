@@ -22,3 +22,11 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Planilhas temporarias de upload (dados de clientes — nunca versionar)
+/public/*.xlsx
+# Dumps/backups de banco
+/backup_*.sql
+/*.sql
+# Arquivos temporarios do editor
+/storage/framework/lsp-*.php

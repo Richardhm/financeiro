@@ -1,27 +1,70 @@
 $("#arquivo_atualizar").on('change',function(){
     let files = $('#arquivo_atualizar')[0].files;
-    let load = $(".ajax_load");
-    // let file = $(this).val();
+    if (!files.length) return;
     let fd = new FormData();
     fd.append('file',files[0]);
-    // fd.append('file',e.target.files[0]);
     $.ajax({
         url:atualizarIndividual,
         method:"POST",
         data:fd,
         contentType: false,
         processData: false,
-        beforeSend: function () {
-            load.fadeIn(200).css("display", "flex");
-        },
         success:function(res) {
-            if(res == "successo") {
-                load.fadeOut(200);
-                window.location.reload();
+            if (res && res.job_id) {
+                acompanharProgressoSincronizacao(res.job_id);
+            } else {
+                Swal.fire({ icon:'error', title:'Erro', text:'Resposta inesperada do servidor.', background:'#1f2937', color:'#f3f4f6' });
             }
+        },
+        error:function() {
+            Swal.fire({ icon:'error', title:'Erro no envio', text:'Verifique a planilha e tente novamente.', background:'#1f2937', color:'#f3f4f6' });
         }
     });
 });
+
+function acompanharProgressoSincronizacao(jobId) {
+    $('#atualizarModal').addClass('hidden');
+    Swal.fire({
+        title: 'Atualizando parcelas...',
+        html: '<div id="sync-prog-texto" style="font-size:14px;color:#cbd5e1;">Iniciando processamento…</div>' +
+              '<div style="background:#374151;border-radius:8px;height:16px;margin-top:12px;overflow:hidden;">' +
+              '<div id="sync-prog-barra" style="background:linear-gradient(90deg,#2563eb,#38bdf8);height:100%;width:0%;transition:width .4s;"></div></div>' +
+              '<div id="sync-prog-pct" style="font-size:12px;color:#94a3b8;margin-top:6px;">0%</div>',
+        background: '#1f2937',
+        color: '#f3f4f6',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: function () { consultarProgressoSincronizacao(jobId); }
+    });
+}
+
+function consultarProgressoSincronizacao(jobId) {
+    $.get(urlProgressoSincronizacao.replace('__JOB__', jobId))
+        .done(function (d) {
+            if (d.status === 'completed') {
+                Swal.fire({
+                    icon:'success', title:'Concluído!', text:'Parcelas atualizadas com sucesso.',
+                    background:'#1f2937', color:'#f3f4f6', timer:1800, showConfirmButton:false
+                }).then(function(){ window.location.reload(); });
+                return;
+            }
+            if (d.status === 'failed') {
+                Swal.fire({ icon:'error', title:'Falha no processamento', text:(d.error || 'Erro desconhecido.'), background:'#1f2937', color:'#f3f4f6' });
+                return;
+            }
+            let total = d.total_lines || 0;
+            let feito = d.processed_lines || 0;
+            let pct   = total > 0 ? Math.min(100, Math.round(feito * 100 / total)) : 0;
+            $('#sync-prog-texto').text(feito + ' de ' + total + ' linhas processadas');
+            $('#sync-prog-barra').css('width', pct + '%');
+            $('#sync-prog-pct').text(pct + '%');
+            setTimeout(function(){ consultarProgressoSincronizacao(jobId); }, 2000);
+        })
+        .fail(function () {
+            setTimeout(function(){ consultarProgressoSincronizacao(jobId); }, 3000);
+        });
+}
 
 $("#arquivo_atualizar_empresarial").on('change',function(){
 
@@ -62,8 +105,7 @@ $("#arquivo_atualizar_empresarial").on('change',function(){
 
 $("#arquivo_parcela").on('change',function(){
     let files = $('#arquivo_parcela')[0].files;
-    let load = $(".ajax_load");
-    let file = $(this).val();
+    if (!files.length) return;
     let fd = new FormData();
     fd.append('file',files[0]);
     $.ajax({
@@ -73,15 +115,35 @@ $("#arquivo_parcela").on('change',function(){
         contentType: false,
         processData: false,
         beforeSend: function () {
-            //$('#atualizarModal').modal('hide');
-            //load.fadeIn(200).css("display", "flex");
+            Swal.fire({
+                title: 'Processando parcelas...',
+                html: 'Confirmando os pagamentos da operadora, aguarde.',
+                background: '#1f2937',
+                color: '#f3f4f6',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: function () { Swal.showLoading(); }
+            });
         },
         success:function(res) {
-            console.log(res);
-            //if(res == "successo") {
-            //load.fadeOut(200);
-            //window.location.reload();
-            //}
+            if (res && res.success) {
+                var d = res.detalhes || {};
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Parcelas processadas',
+                    background: '#1f2937',
+                    color: '#f3f4f6',
+                    html: 'Parcelas confirmadas: <b>' + (d.confirmados || 0) + '</b><br>' +
+                          'J&aacute; confirmadas antes: <b>' + (d.ja_confirmados || 0) + '</b><br>' +
+                          'N&atilde;o encontradas no sistema: <b>' + (d.nao_encontrados || 0) + '</b>'
+                }).then(function(){ window.location.reload(); });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Erro', text: (res && res.message) || 'Falha no processamento' });
+            }
+        },
+        error:function() {
+            Swal.fire({ icon: 'error', title: 'Erro ao processar a planilha de parcelas' });
         }
     });
 });
@@ -92,8 +154,7 @@ $("#arquivo_parcela").on('change',function(){
 
 $("#arquivo_adiantamento").on('change',function(){
     let files = $('#arquivo_adiantamento')[0].files;
-    let load = $(".ajax_load");
-    let file = $(this).val();
+    if (!files.length) return;
     let fd = new FormData();
     fd.append('file',files[0]);
     $.ajax({
@@ -103,15 +164,45 @@ $("#arquivo_adiantamento").on('change',function(){
         contentType: false,
         processData: false,
         beforeSend: function () {
-            //$('#atualizarModal').modal('hide');
-            //load.fadeIn(200).css("display", "flex");
+            Swal.fire({
+                title: 'Processando adiantamento...',
+                html: 'Confirmando os pagamentos, aguarde.',
+                background: '#1f2937',
+                color: '#f3f4f6',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: function () { Swal.showLoading(); }
+            });
         },
         success:function(res) {
-            console.log(res);
-            //if(res == "successo") {
-                //load.fadeOut(200);
-                //window.location.reload();
-            //}
+            if (res && res.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Concluído!',
+                    text: res.message || 'Adiantamento processado com sucesso.',
+                    background: '#1f2937', color: '#f3f4f6',
+                    confirmButtonColor: '#2563eb'
+                }).then(function(){ window.location.reload(); });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: (res && res.message) || 'Falha ao processar o adiantamento.',
+                    background: '#1f2937', color: '#f3f4f6'
+                });
+            }
+        },
+        error: function (xhr) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro no processamento',
+                text: (xhr.responseJSON && xhr.responseJSON.message) || 'Verifique a planilha e tente novamente.',
+                background: '#1f2937', color: '#f3f4f6'
+            });
+        },
+        complete: function () {
+            $("#arquivo_adiantamento").val('');
         }
     });
 });
@@ -132,14 +223,35 @@ $("#arquivo_estorno").on('change',function(){
         contentType: false,
         processData: false,
         beforeSend: function () {
-            //$('#atualizarModal').modal('hide');
-            load.fadeIn(200).css("display", "flex");
+            Swal.fire({
+                title: 'Processando estornos...',
+                html: 'Identificando clientes e vendedores, aguarde.',
+                background: '#1f2937',
+                color: '#f3f4f6',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: function () { Swal.showLoading(); }
+            });
         },
         success:function(res) {
-            if(res == "successo") {
-                load.fadeOut(200);
+            if (res && res.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Estornos processados',
+                    background: '#1f2937',
+                    color: '#f3f4f6',
+                    html: 'Linhas lidas: <b>' + res.linhas + '</b><br>' +
+                          'Novos estornos aplicados: <b>' + res.novos + '</b><br>' +
+                          'J&aacute; processados (ignorados): <b>' + res.ja_processados + '</b><br>' +
+                          'Sem v&iacute;nculo no sistema: <b>' + res.sem_vinculo + '</b>'
+                }).then(function(){ window.location.reload(); });
+            } else {
                 window.location.reload();
             }
+        },
+        error:function() {
+            Swal.fire({ icon: 'error', title: 'Erro ao processar a planilha de estorno' });
         }
     });
 });
@@ -215,14 +327,33 @@ $("#arquivo_cancelados").on('change',function(){
         contentType: false,
         processData: false,
         beforeSend: function () {
-            //load.fadeIn(200).css("display", "flex");
-            //$('#uploadModal').modal('hide');
+            Swal.fire({
+                title: 'Processando cancelados...',
+                html: 'Atualizando os contratos cancelados, aguarde.',
+                background: '#1f2937',
+                color: '#f3f4f6',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: function () { Swal.showLoading(); }
+            });
         },
         success:function(res) {
             if(res == "sucesso") {
-                window.location.reload();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Cancelados processados',
+                    background: '#1f2937',
+                    color: '#f3f4f6',
+                    timer: 1600,
+                    showConfirmButton: false
+                }).then(function(){ window.location.reload(); });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Erro ao processar a planilha de cancelados' });
             }
-
+        },
+        error:function() {
+            Swal.fire({ icon: 'error', title: 'Erro ao processar a planilha de cancelados' });
         }
     });
 
@@ -248,20 +379,27 @@ $("#arquivo_upload").on('change',function(e){
         contentType: false,
         processData: false,
         beforeSend: function () {
-            load.fadeIn(200).css("display", "flex");
             $("#mensagem_erro").fadeOut(200).addClass("hidden"); // Oculta mensagens de erro antigas
-            //$('#uploadModal').modal('hide');
+            Swal.fire({
+                title: 'Processando planilha...',
+                html: 'Cadastrando os contratos, aguarde.',
+                background: '#1f2937',
+                color: '#f3f4f6',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: function () { Swal.showLoading(); }
+            });
         },
         success:function(res) {
             console.log(res);
             if(res == "sucesso") {
-                window.location.reload();
-                // load.fadeOut(200);
-                // $('#uploadModal').modal('show');
-                // $(".div_icone_arquivo_upload").removeClass('btn-danger').addClass('btn-success').html('<i class="far fa-smile-beam fa-lg"></i>');
-                // $("#arquivo_upload").val('').prop('disabled',true);
-
+                Swal.fire({
+                    icon:'success', title:'Concluído!', text:'Planilha processada com sucesso.',
+                    background:'#1f2937', color:'#f3f4f6', timer:1500, showConfirmButton:false
+                }).then(function(){ window.location.reload(); });
             } else {
+                Swal.close();
                 $("#mensagem_erro")
                     .html(res.message || "Algo deu errado durante a importação.")
                     .removeClass("hidden")
@@ -269,6 +407,7 @@ $("#arquivo_upload").on('change',function(e){
             }
         },
         error: function (xhr) {
+            Swal.close();
             // Captura erros do backend
             const erro = xhr.responseJSON?.message || "Erro desconhecido no upload."; // Captura a mensagem do erro
             $("#mensagem_erro")
@@ -281,8 +420,6 @@ $("#arquivo_upload").on('change',function(e){
 
         },
         complete: function () {
-            // Após completar a requisição, oculta o loader
-            load.fadeOut(200);
         },
 
 

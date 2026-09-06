@@ -54,18 +54,24 @@ class FinanceiroController extends Controller
 
     public function listarEstorno()
     {
-        $resultado = DB::table('clientes')
-            ->join('users', 'users.id', '=', 'clientes.user_id')
-            ->join('contratos', 'contratos.cliente_id', '=', 'clientes.id')
+        // Eventos de estorno processados via planilha (tabela estornos):
+        // rastreabilidade completa — pendente, aplicado (com folha) ou sem vinculo
+        $resultado = DB::table('estornos')
+            ->leftJoin('clientes', 'clientes.id', '=', 'estornos.cliente_id')
+            ->leftJoin('users', 'users.id', '=', 'estornos.user_id')
             ->select(
-                DB::raw("DATE_FORMAT(contratos.created_at, '%d/%m/%Y') as created_at"),
-                'cateirinha',
-                'nome',
-                'users.name as usuario',
-                'contratos.id'
+                DB::raw("DATE_FORMAT(COALESCE(estornos.data_cancelamento, estornos.created_at), '%d/%m/%Y') as created_at"),
+                DB::raw('estornos.carteirinha as cateirinha'),
+                DB::raw('COALESCE(clientes.nome, estornos.beneficiario) as nome'),
+                DB::raw("COALESCE(users.name, '— sem vinculo —') as usuario"),
+                'estornos.id',
+                'estornos.lote',
+                'estornos.valor',
+                'estornos.status',
+                'estornos.folha_referencia',
+                DB::raw("DATE_FORMAT(estornos.data_aplicacao, '%d/%m/%Y') as data_aplicacao")
             )
-            ->where('contratos.estorno',1)
-            ->whereNull('contratos.valor_estorno')
+            ->orderByDesc('estornos.id')
             ->get();
 
         return $resultado;
@@ -317,6 +323,15 @@ class FinanceiroController extends Controller
             $comissoes->whereHas('contrato.cliente.user', function ($q) use ($corretorFilter) {
                 $q->where('name', 'like', "%$corretorFilter%");
             });
+        }
+
+        // Cancelados (financeiro_id = 12) saem da listagem principal e dos indicadores.
+        // So aparecem quando o filtro de status pede explicitamente "Cancelado".
+        $buscandoCancelados = $parcelaFilter && stripos($parcelaFilter, 'cancelado') !== false;
+        if (!$buscandoCancelados) {
+            $comissoes->whereHas('contrato', fn($q) => $q->where('financeiro_id', '!=', 12));
+            $queryCount->whereHas('contrato', fn($q) => $q->where('financeiro_id', '!=', 12));
+            $stats->where('contratos.financeiro_id', '!=', 12);
         }
 
         $recordsTotal = $stats->first()->total_comissoes;
@@ -976,6 +991,11 @@ class FinanceiroController extends Controller
 
         /*********************LOgica Antiga*************************/
 
+        // PJ: vidas de Super Simples contam para a faixa — recalcular o mês do cadastro
+        if ($tipo_contrato === 'pj') {
+            $mesCadastro = date('Y-m', strtotime($dados['created_at'] ?: date('Y-m-d')));
+            \App\Services\PjComissaoService::recalcularMes($request->user_id, $mesCadastro);
+        }
 
        return redirect('/financeiro?ac=empresarial');
     }
@@ -1120,8 +1140,8 @@ class FinanceiroController extends Controller
 
         set_time_limit(300);
         $filename = uniqid() . ".xlsx";
-        if (move_uploaded_file($request->file, $filename)) {
-            $filePath = base_path("public/{$filename}");
+        $filePath = \App\Support\PlanilhaUpload::receber($request->file("file") ?: $request->file, $filename);
+        if (is_readable($filePath)) {
             $cpfs = [];
             $reader = ReaderEntityFactory::createReaderFromFile($filePath);
             $reader->open($filePath);
@@ -1277,7 +1297,7 @@ class FinanceiroController extends Controller
 //                                    //->where("tabela_origens_id", 2)
 //                                    ->get();
 //                                foreach ($dados as $c) {
-//                                    $valor_comissao_default = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 25;
+//                                    $valor_comissao_default = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 35;
 //                                    $comissaoVendedor = new ComissoesCorretoresLancadas();
 //                                    $comissaoVendedor->comissoes_id = $comissao->id;
 //                                    $comissaoVendedor->parcela = $c->parcela;
@@ -1320,7 +1340,7 @@ class FinanceiroController extends Controller
 //                                if (count($comissoes_configuradas_personalizado) >= 1) {//AQUI CORRETOR TEM COMISSOES PERSONALIZADAS
 //                                    //dd("PARCEIRO COM CONF");
 //                                    foreach ($comissoes_configuradas_personalizado as $c) {
-//                                        $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 25;
+//                                        $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 35;
 //                                        $comissaoVendedor = new ComissoesCorretoresLancadas();
 //                                        $comissaoVendedor->comissoes_id = $comissao->id;
 //                                        $comissaoVendedor->parcela = $c->parcela;
@@ -1362,7 +1382,7 @@ class FinanceiroController extends Controller
 //                                        ->whereNull("user_id")
 //                                        ->get();
 //                                    foreach ($comissoes_configuradas_corretor as $c) {
-//                                        $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 25;
+//                                        $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 35;
 //                                        $comissaoVendedor = new ComissoesCorretoresLancadas();
 //                                        $comissaoVendedor->comissoes_id = $comissao->id;
 //                                        $comissaoVendedor->parcela = $c->parcela;
@@ -1421,8 +1441,8 @@ class FinanceiroController extends Controller
     {
         set_time_limit(300);
         $filename = uniqid() . ".xlsx";
-        if (move_uploaded_file($request->file, $filename)) {
-            $filePath = base_path("public/{$filename}");
+        $filePath = \App\Support\PlanilhaUpload::receber($request->file("file") ?: $request->file, $filename);
+        if (is_readable($filePath)) {
             $cpfs = [];
             $reader = ReaderEntityFactory::createReaderFromFile($filePath);
             $reader->open($filePath);
@@ -1490,7 +1510,7 @@ class FinanceiroController extends Controller
                             $contrato->codigo_externo = $cells[0]->getValue();
                             $contrato->data_boleto = implode("-", array_reverse(explode("/", $cells[17]->getValue())));
                             $contrato->valor_adesao = $this->parseNumber($cells[12]->getValue());
-                            $contrato->valor_plano =  $this->parseNumber($cells[12]->getValue()) - 25;
+                            $contrato->valor_plano =  $this->parseNumber($cells[12]->getValue()) - 35;
                             $contrato->coparticipacao = 1;
                             $contrato->odonto = 0;
                             $contrato->created_at = $data_vigencia;
@@ -1520,7 +1540,7 @@ class FinanceiroController extends Controller
                                     ->get();
 
                                 foreach ($dados as $c) {
-                                    $valor_comissao_default = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 25;
+                                    $valor_comissao_default = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 35;
                                     $comissaoVendedor = new ComissoesCorretoresLancadas();
                                     $comissaoVendedor->comissoes_id = $comissao->id;
                                     $comissaoVendedor->parcela = $c->parcela;
@@ -1579,7 +1599,7 @@ class FinanceiroController extends Controller
                                 if (count($comissoes_configuradas_personalizado) >= 1) {//AQUI CORRETOR TEM COMISSOES PERSONALIZADAS
                                     //dd("PARCEIRO COM CONF");
                                     foreach ($comissoes_configuradas_personalizado as $c) {
-                                        $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 25;
+                                        $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 35;
                                         $comissaoVendedor = new ComissoesCorretoresLancadas();
                                         $comissaoVendedor->comissoes_id = $comissao->id;
                                         //$comissaoVendedor->user_id = auth()->user()->id;
@@ -1632,7 +1652,7 @@ class FinanceiroController extends Controller
                                         ->get();
 
                                     foreach ($comissoes_configuradas_corretor as $c) {
-                                        $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 25;
+                                        $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 35;
                                         $comissaoVendedor = new ComissoesCorretoresLancadas();
                                         $comissaoVendedor->comissoes_id = $comissao->id;
                                         //$comissaoVendedor->user_id = auth()->user()->id;
@@ -1695,8 +1715,8 @@ class FinanceiroController extends Controller
     {
         set_time_limit(600);
         $filename = uniqid() . ".xlsx";
-        if (move_uploaded_file($request->file, $filename)) {
-            $filePath = base_path("public/{$filename}");
+        $filePath = \App\Support\PlanilhaUpload::receber($request->file("file") ?: $request->file, $filename);
+        if (is_readable($filePath)) {
             $cpfs = [];
             $reader = ReaderEntityFactory::createReaderFromFile($filePath);
             $reader->open($filePath);
@@ -1825,7 +1845,7 @@ class FinanceiroController extends Controller
                                 $contrato->codigo_externo = $cells[0]->getValue();
                                 $contrato->data_boleto = implode("-", array_reverse(explode("/", $cells[17]->getValue())));
                                 $contrato->valor_adesao = str_replace([".", ","], ["", "."], $cells[12]->getValue());
-                                $contrato->valor_plano = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 25;
+                                $contrato->valor_plano = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 35;
                                 $contrato->coparticipacao = 1;
                                 $contrato->odonto = 0;
                                 $contrato->created_at = $data_vigencia;
@@ -1855,7 +1875,7 @@ class FinanceiroController extends Controller
                                         ->get();
 
                                     foreach ($dados as $c) {
-                                        $valor_comissao_default = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 25;
+                                        $valor_comissao_default = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 35;
                                         $comissaoVendedor = new ComissoesCorretoresLancadas();
                                         $comissaoVendedor->comissoes_id = $comissao->id;
                                         $comissaoVendedor->parcela = $c->parcela;
@@ -1914,7 +1934,7 @@ class FinanceiroController extends Controller
                                     if (count($comissoes_configuradas_personalizado) >= 1) {//AQUI CORRETOR TEM COMISSOES PERSONALIZADAS
                                         //dd("PARCEIRO COM CONF");
                                         foreach ($comissoes_configuradas_personalizado as $c) {
-                                            $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 25;
+                                            $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 35;
                                             $comissaoVendedor = new ComissoesCorretoresLancadas();
                                             $comissaoVendedor->comissoes_id = $comissao->id;
                                             //$comissaoVendedor->user_id = auth()->user()->id;
@@ -1966,7 +1986,7 @@ class FinanceiroController extends Controller
                                             ->get();
 
                                         foreach ($comissoes_configuradas_corretor as $c) {
-                                            $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 25;
+                                            $valor_comissao = (float)str_replace([".", ","], ["", "."], $cells[12]->getValue()) - 35;
                                             $comissaoVendedor = new ComissoesCorretoresLancadas();
                                             $comissaoVendedor->comissoes_id = $comissao->id;
                                             //$comissaoVendedor->user_id = auth()->user()->id;
@@ -2156,9 +2176,9 @@ class FinanceiroController extends Controller
     {
         set_time_limit(600);
         $filename = uniqid() . ".xlsx";
+        $filePath = \App\Support\PlanilhaUpload::receber($request->file("file") ?: $request->file, $filename);
         try {
-            if (move_uploaded_file($request->file, $filename)) {
-                $filePath = base_path("public/{$filename}");
+            if (is_readable($filePath)) {
                 // Abrir o arquivo
                 $reader = ReaderEntityFactory::createReaderFromFile($filePath);
                 $reader->open($filePath);
@@ -2253,37 +2273,119 @@ class FinanceiroController extends Controller
     {
         set_time_limit(600);
         $filename = uniqid() . ".xlsx";
-        if(move_uploaded_file($request->file, $filename)) {
-            $filePath = base_path("public/{$filename}");
-            $cpfs = [];
-            $reader = ReaderEntityFactory::createReaderFromFile($filePath);
-            $reader->open($filePath);
-            $cidade = "";
-            foreach ($reader->getSheetIterator() as $sheet) {
-                foreach ($sheet->getRowIterator() as $rowNumber => $row) {
-                    if ($rowNumber > 1) {
-                        $cells = $row->getCells();
-                        $carteirinhaCompleta = $cells[3]->getValue();
+        $filePath = \App\Support\PlanilhaUpload::receber($request->file("file") ?: $request->file, $filename);
+        if (!is_readable($filePath)) {
+            return response()->json(['success' => false, 'message' => 'Falha ao receber o arquivo.'], 422);
+        }
 
-                        // Remove os 3 últimos dígitos da carteirinha
-                        $carteirinha = substr($carteirinhaCompleta, 0, 11);
+        $reader = ReaderEntityFactory::createReaderFromFile($filePath);
+        $reader->open($filePath);
 
-                        // Verifica se existe um cliente com esta carteirinha
-                        $cliente = \DB::table('clientes')
-                            ->where('cateirinha', $carteirinha)
-                            ->first(); // Retorna o cliente correspondente (se existir)
+        $linhas = 0;
+        $novos = 0;
+        $jaProcessados = 0;
+        $semVinculo = 0;
 
-                        if ($cliente) {
-                            // Atualiza o campo 'estorno' na tabela contratos para 1
-                            \DB::table('contratos')
-                                ->where('cliente_id', $cliente->id) // Relaciona pelo cliente encontrado
-                                ->update(['estorno' => 1]);
-                        }
-                    }
+        foreach ($reader->getSheetIterator() as $sheet) {
+            foreach ($sheet->getRowIterator() as $rowNumber => $row) {
+                if ($rowNumber <= 1) {
+                    continue;
                 }
+                $cells = $row->getCells();
+                if (count($cells) < 13) {
+                    continue;
+                }
+
+                $valorCell = function ($idx) use ($cells) {
+                    $v = isset($cells[$idx]) ? $cells[$idx]->getValue() : null;
+                    return $v instanceof \DateTime ? $v->format('Y-m-d') : trim((string) $v);
+                };
+
+                $carteirinha = substr($valorCell(3), 0, 11);
+                $lote        = $valorCell(8);
+                $valor       = (float) str_replace(',', '.', $valorCell(12));
+                $dataCanc    = $valorCell(6) ?: null;
+
+                if (!$carteirinha || !$lote || $valor <= 0) {
+                    continue;
+                }
+                $linhas++;
+
+                // REGRA CRITICA: identificacao unica do evento (lote + carteirinha).
+                // Evento ja registrado nunca gera segundo desconto, mesmo reenviando a planilha.
+                $jaExiste = \DB::table('estornos')
+                    ->where('lote', $lote)
+                    ->where('carteirinha', $carteirinha)
+                    ->exists();
+                if ($jaExiste) {
+                    $jaProcessados++;
+                    continue;
+                }
+
+                // Identifica o cliente pelo historico (carteirinha), independente do status atual
+                $cliente = \DB::table('clientes')->where('cateirinha', $carteirinha)->first();
+                $contrato = $cliente
+                    ? \DB::table('contratos')->where('cliente_id', $cliente->id)->orderByDesc('id')->first()
+                    : null;
+
+                // Vendedor: quem recebeu ou receberia comissao (historico de comissoes; fallback dono do cliente)
+                $vendedorId = null;
+                if ($contrato) {
+                    $vendedorId = \DB::table('comissoes')->where('contrato_id', $contrato->id)->value('user_id');
+                }
+                if (!$vendedorId && $cliente) {
+                    $vendedorId = $cliente->user_id;
+                }
+
+                $vinculado = $contrato && $vendedorId;
+
+                \DB::table('estornos')->insert([
+                    'lote'              => $lote,
+                    'carteirinha'       => $carteirinha,
+                    'beneficiario'      => $valorCell(4) ?: null,
+                    'cliente_id'        => $cliente->id ?? null,
+                    'contrato_id'       => $contrato->id ?? null,
+                    'user_id'           => $vendedorId,
+                    'valor'             => $valor,
+                    'data_cancelamento' => $dataCanc,
+                    'status'            => $vinculado ? 'pendente' : 'sem_vinculo',
+                    'created_at'        => now(),
+                    'updated_at'        => now(),
+                ]);
+
+                if (!$vinculado) {
+                    $semVinculo++;
+                    continue;
+                }
+                $novos++;
+
+                // valor_estorno = soma dos eventos ainda nao aplicados deste contrato.
+                // Um evento novo reabre a baixa (data_baixa_estorno = null) sem tocar nos ja aplicados.
+                $totalPendente = \DB::table('estornos')
+                    ->where('contrato_id', $contrato->id)
+                    ->where('status', 'pendente')
+                    ->sum('valor');
+
+                \DB::table('contratos')->where('id', $contrato->id)->update([
+                    'estorno'            => 1,
+                    'valor_estorno'      => $totalPendente,
+                    'data_baixa_estorno' => null,
+                    // Cliente estornado foi cancelado pela operadora: parcelas em aberto
+                    // saem das folhas futuras (mesmo mecanismo dos cancelados)
+                    'financeiro_id'      => 12,
+                ]);
             }
         }
-        return "successo";
+        $reader->close();
+        @unlink($filePath);
+
+        return response()->json([
+            'success'        => true,
+            'linhas'         => $linhas,
+            'novos'          => $novos,
+            'ja_processados' => $jaProcessados,
+            'sem_vinculo'    => $semVinculo,
+        ]);
     }
 
     /****************************************************************************************************************/
@@ -2325,20 +2427,55 @@ class FinanceiroController extends Controller
     public function sincronizarBaixasJaExiste(Request $request)
     {
         $filename = uniqid() . ".xlsx";
-        if (!move_uploaded_file($request->file, $filename)) {
+        $filePath = \App\Support\PlanilhaUpload::receber($request->file("file") ?: $request->file, $filename);
+        if (!is_readable($filePath)) {
             return response()->json(['error' => 'Falha no upload'], 400);
         }
-        $filePath = base_path("public/{$filename}");
 
         $totalLines = $this->countTotalLines($filePath);
         \Log::info("Total de linhas contadas: " . $totalLines);
 
-        \Illuminate\Support\Facades\Artisan::call('spreadsheet:process', [
-            'file'     => $filePath,
-            '--job-id' => $filename,
-        ]);
+        $cacheKey = "spreadsheet_processing_{$filename}";
+        Cache::put($cacheKey, [
+            'status'          => 'processing',
+            'total_lines'     => $totalLines,
+            'processed_lines' => 0,
+            'started_at'      => now(),
+            'filename'        => $filename,
+        ], 3600);
 
-        return "successo";
+        $artisan = base_path('artisan');
+        if (PHP_OS_FAMILY === 'Windows') {
+            $command = sprintf('start /B "" php "%s" spreadsheet:process "%s" --job-id="%s"', $artisan, $filePath, $filename);
+            pclose(popen($command, 'r'));
+        } else {
+            $command = sprintf(
+                'nohup php %s spreadsheet:process %s --job-id=%s > /dev/null 2>&1 &',
+                escapeshellarg($artisan),
+                escapeshellarg($filePath),
+                escapeshellarg($filename)
+            );
+            exec($command);
+        }
+
+        \Log::info("Processamento disparado em background: " . $filename);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Processamento iniciado em background',
+            'job_id'  => $filename,
+        ]);
+    }
+
+    public function progressoSincronizacao($jobId)
+    {
+        if (!preg_match('/^[a-f0-9]+\.xlsx$/', $jobId)) {
+            return response()->json(['status' => 'unknown'], 400);
+        }
+
+        $data = Cache::get("spreadsheet_processing_{$jobId}");
+
+        return response()->json($data ?: ['status' => 'unknown']);
     }
 
     /****************************************************************************************************************/
@@ -2358,7 +2495,7 @@ class FinanceiroController extends Controller
                     //->where("tabela_origens_id", 2)
                     ->get();
                 foreach ($dados as $c) {
-                    $valor_comissao_default = $valor - 25;
+                    $valor_comissao_default = $valor - 35;
                     $comissaoVendedor = new ComissoesCorretoresLancadas();
                     $comissaoVendedor->comissoes_id = $comissao->id;
                     $comissaoVendedor->parcela = $c->parcela;
@@ -2403,7 +2540,7 @@ class FinanceiroController extends Controller
                 if (count($comissoes_configuradas_personalizado) >= 1) {//AQUI CORRETOR TEM COMISSOES PERSONALIZADAS
                     //dd("PARCEIRO COM CONF");
                     foreach ($comissoes_configuradas_personalizado as $c) {
-                        $valor_comissao = $valor - 25;
+                        $valor_comissao = $valor - 35;
                         $comissaoVendedor = new ComissoesCorretoresLancadas();
                         $comissaoVendedor->comissoes_id = $comissao->id;
                         $comissaoVendedor->parcela = $c->parcela;
@@ -2449,7 +2586,7 @@ class FinanceiroController extends Controller
 
 
                     foreach ($comissoes_configuradas_corretor as $c) {
-                        $valor_comissao = $valor - 25;
+                        $valor_comissao = $valor - 35;
                         $comissaoVendedor = new ComissoesCorretoresLancadas();
                         $comissaoVendedor->comissoes_id = $comissao->id;
                         $comissaoVendedor->parcela = $c->parcela;
@@ -4250,6 +4387,14 @@ class FinanceiroController extends Controller
             if(!ContratoEmpresarial::find($id_contrato_empresarial)->delete()) {
                 $status = false;
             }
+
+            // PJ: vidas do mês mudaram — recalcular a faixa retroativamente
+            $vendedorExcluido = User::find($empresarial->user_id);
+            if ($vendedorExcluido && $vendedorExcluido->tipo_contrato === 'pj') {
+                $mesCadastro = date('Y-m', strtotime($empresarial->created_at));
+                \App\Services\PjComissaoService::recalcularMes($empresarial->user_id, $mesCadastro);
+            }
+
             return $status;
         }
     }
@@ -5329,8 +5474,8 @@ class FinanceiroController extends Controller
     {
         set_time_limit(300);
         $filename = uniqid() . ".xlsx";
-        if (move_uploaded_file($request->file, $filename)) {
-            $filePath = base_path("public/{$filename}");
+        $filePath = \App\Support\PlanilhaUpload::receber($request->file("file") ?: $request->file, $filename);
+        if (is_readable($filePath)) {
             $cpfs = [];
             $reader = ReaderEntityFactory::createReaderFromFile($filePath);
             $reader->open($filePath);
@@ -5596,8 +5741,8 @@ class FinanceiroController extends Controller
     {
 
         $filename = uniqid() . ".xlsx";
-        if (move_uploaded_file($request->file, $filename)) {
-            $filePath = base_path("public/{$filename}");
+        $filePath = \App\Support\PlanilhaUpload::receber($request->file("file") ?: $request->file, $filename);
+        if (is_readable($filePath)) {
             $reader = ReaderEntityFactory::createReaderFromFile($filePath);
             $reader->open($filePath);
             foreach ($reader->getSheetIterator() as $sheet) {

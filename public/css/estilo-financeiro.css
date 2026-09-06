@@ -1,11 +1,12 @@
 table.dataTable tbody td {
-    font-size: 0.8em !important;
+    font-size: 0.65em !important;
     padding: 0px !important;
 }
 
 table.dataTable thead th {
-    font-size: 0.8em !important;
+    font-size: 0.78em !important;
     padding: 0px !important;
+    color: #c2410c !important;
 }
 
 .dataTables_wrapper .dataTables_paginate .paginate_button {
@@ -84,6 +85,7 @@ input[readonly] {
 
 
 #tabela_individual td:nth-child(9), /* Índice para 'status' */
+#tabela_individual td:nth-child(11), /* Índice para 'nasci' */
 #tabela_individual td:nth-child(14), /* Índice para 'status' */
 #tabela_individual td:nth-child(15), /* Índice para 'estagiario' */
 #tabela_individual td:nth-child(16) /* Índice para 'corretor_id' */ {
@@ -92,6 +94,7 @@ input[readonly] {
 
 
 #tabela_individual th:nth-child(9), /* Índice para 'status' */
+#tabela_individual th:nth-child(11), /* Índice para 'nasci' */
 #tabela_individual th:nth-child(14), /* Índice para 'status' */
 #tabela_individual th:nth-child(15), /* Índice para 'estagiario' */
 #tabela_individual th:nth-child(16) /* Índice para 'corretor_id' */ {
@@ -320,7 +323,7 @@ main, .min-h-screen, [class*="min-h-screen"] {
 table.dataTable thead th,
 table.dataTable thead td {
     background-color: #1a1a1a !important;
-    color: #e0e0e0 !important;
+    color: #c2410c !important;
     border-bottom-color: #444 !important;
 }
 table.dataTable tbody tr {
@@ -476,7 +479,7 @@ label {
 .fin-fieldset {
     border: 1px solid #2a3d55;
     border-radius: 8px;
-    padding: 4px 12px 8px;
+    padding: 4px 8px 6px;
     background: #0e1a28;
     display: inline-flex;
     flex-direction: column;
@@ -509,14 +512,14 @@ label {
 .fin-btns-group {
     display: flex;
     align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
+    gap: 4px;
+    flex-wrap: nowrap;
 }
 .fin-status-group {
     display: flex;
     align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
+    gap: 4px;
+    flex-wrap: nowrap;
 }
 
 /* Divisor visual legado (mantido para compatibilidade) */
@@ -564,24 +567,24 @@ label {
 
 /* Botões de ação */
 .fin-btn {
-    padding: 5px 12px;
+    padding: 3px 5px;
     border-radius: 6px;
-    font-size: 11px;
+    font-size: 9.5px;
     font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
     transition: filter 0.15s, transform 0.1s;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    height: 30px;
+    gap: 3px;
+    height: 26px;
     user-select: none;
 }
 .fin-btn:hover { filter: brightness(1.18); transform: translateY(-1px); }
 .fin-btn a { text-decoration: none; }
 .fin-btn-icon {
-    width: 13px;
-    height: 13px;
+    width: 10px;
+    height: 10px;
     flex-shrink: 0;
 }
 
@@ -653,8 +656,8 @@ label {
 /* Badges de estatísticas */
 .fin-stats-group {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    flex-wrap: nowrap;
+    gap: 2px;
     align-items: center;
 }
 
@@ -662,8 +665,8 @@ label {
     background: #242424;
     border: 1px solid #363636;
     border-radius: 5px;
-    padding: 3px 9px;
-    font-size: 11px;
+    padding: 2px 3px;
+    font-size: 9px;
     color: #b0b0b0;
     white-space: nowrap;
     cursor: default;
@@ -780,7 +783,8 @@ label {
 #tabela_individual_filter input[type='search'],
 #tabela_coletivo_filter input[type='search'],
 #tabela_empresarial_filter input[type='search'],
-#tabela_odonto_filter input[type='search'] {
+#tabela_odonto_filter input[type='search'],
+#listar_usuarios_filter input[type='search'] {
     background: transparent !important;
     border: none !important;
     outline: none !important;
@@ -796,9 +800,13 @@ label {
 #tabela_individual_filter input[type='search']::placeholder,
 #tabela_coletivo_filter input[type='search']::placeholder,
 #tabela_empresarial_filter input[type='search']::placeholder,
-#tabela_odonto_filter input[type='search']::placeholder {
+#tabela_odonto_filter input[type='search']::placeholder,
+#listar_usuarios_filter input[type='search']::placeholder {
     color: #3d5a78 !important;
 }
+
+/* SweetAlert sempre acima das modais do sistema (que usam z-index ate 9999) */
+.swal2-container { z-index: 99999 !important; }
 
 /* === EXPORT EXCEL BUTTON === */
 .dt-button.btn-exportar,

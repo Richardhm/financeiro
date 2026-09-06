@@ -281,7 +281,7 @@ class ProcessSpreadsheet extends Command
         $cliente = Cliente::select('clientes.*')
             ->join('contratos', 'contratos.cliente_id', '=', 'clientes.id')
             ->where('clientes.nome', $nome)
-            ->where('contratos.valor_plano', $valor)
+            ->where('contratos.valor_adesao', $valor)
             ->first();
 
         return $cliente ? $cliente->id : null;
@@ -329,68 +329,58 @@ class ProcessSpreadsheet extends Command
         $corretora_id = $user->corretora_id;
         $user_id      = $user->id;
 
-        $comissao_corretor_default  = 0;
-        $comissao_corretor_contagem = 0;
+        // Templates da pagina /folha/template-comissoes: especifico do vendedor > geral > tabela default legada
+        $configuradas = ComissoesCorretoresConfiguracoes::where("plano_id", 1)
+            ->where("administradora_id", 4)
+            ->where("corretora_id", $corretora_id)
+            ->where("user_id", $user_id)
+            ->get();
 
-        if ($user->clt == 1) {
-            $dados = ComissoesCorretoresDefault::where("plano_id", 1)
-                ->where("administradora_id", 4)
-                ->where("corretora_id", $corretora_id)
-                ->get();
-
-            foreach ($dados as $c) {
-                $valor_comissao_default = (float) $valor - 35;
-                $comissaoVendedor = new ComissoesCorretoresLancadas();
-                $comissaoVendedor->comissoes_id = $comissao->id;
-                $comissaoVendedor->parcela      = $c->parcela;
-                $comissaoVendedor->valor        = ($valor_comissao_default * $this->parseNumber($c->valor)) / 100;
-
-                if ($comissao_corretor_default == 0) {
-                    $comissaoVendedor->data             = $data_vigencia;
-                    $comissaoVendedor->status_financeiro = 1;
-                    $comissaoVendedor->data_baixa       = $data_vigencia;
-                    $comissaoVendedor->valor_pago       = $valor;
-                } else {
-                    $comissaoVendedor->data = $this->calcularData($data_vigencia, $dia, $comissao_corretor_default);
-                }
-
-                $comissaoVendedor->save();
-                $comissao_corretor_default++;
-            }
-        } else {
+        if ($configuradas->isEmpty()) {
             $configuradas = ComissoesCorretoresConfiguracoes::where("plano_id", 1)
                 ->where("administradora_id", 4)
                 ->where("corretora_id", $corretora_id)
-                ->where("user_id", $user_id)
+                ->whereNull("user_id")
                 ->get();
+        }
 
-            if ($configuradas->isEmpty()) {
-                $configuradas = ComissoesCorretoresConfiguracoes::where("plano_id", 1)
-                    ->where("administradora_id", 4)
-                    ->where("corretora_id", $corretora_id)
-                    ->whereNull("user_id")
-                    ->get();
+        if ($configuradas->isEmpty()) {
+            $configuradas = ComissoesCorretoresDefault::where("plano_id", 1)
+                ->where("administradora_id", 4)
+                ->where("corretora_id", $corretora_id)
+                ->get();
+        }
+
+        if ($configuradas->isEmpty()) {
+            Log::warning("cadastrarComissao: nenhum template de comissao para corretora {$corretora_id} (plano 1/adm 4) — parcelas NAO criadas para comissao {$comissao->id}");
+            return;
+        }
+
+        // Base = SEMPRE o valor_plano do contrato (mensalidade, sem taxa de adesao)
+        $valorBase = (float) Contrato::where('id', $comissao->contrato_id)->value('valor_plano');
+        if ($valorBase <= 0) {
+            $valorBase = (float) $valor - 35;
+        }
+
+        $contagem = 0;
+        foreach ($configuradas as $c) {
+            $valor_comissao = $valorBase;
+            $comissaoVendedor = new ComissoesCorretoresLancadas();
+            $comissaoVendedor->comissoes_id = $comissao->id;
+            $comissaoVendedor->parcela      = $c->parcela;
+            $comissaoVendedor->valor        = ($valor_comissao * $this->parseNumber($c->valor)) / 100;
+
+            if ($contagem == 0) {
+                $comissaoVendedor->data             = $data_vigencia;
+                $comissaoVendedor->status_financeiro = 1;
+                $comissaoVendedor->data_baixa       = $data_vigencia;
+                $comissaoVendedor->valor_pago       = $valor;
+            } else {
+                $comissaoVendedor->data = $this->calcularData($data_vigencia, $dia, $contagem);
             }
 
-            foreach ($configuradas as $c) {
-                $valor_comissao = (float) $valor - 35;
-                $comissaoVendedor = new ComissoesCorretoresLancadas();
-                $comissaoVendedor->comissoes_id = $comissao->id;
-                $comissaoVendedor->parcela      = $c->parcela;
-                $comissaoVendedor->valor        = ($valor_comissao * $this->parseNumber($c->valor)) / 100;
-
-                if ($comissao_corretor_contagem == 0) {
-                    $comissaoVendedor->data             = $data_vigencia;
-                    $comissaoVendedor->status_financeiro = 1;
-                    $comissaoVendedor->data_baixa       = $data_vigencia;
-                    $comissaoVendedor->valor_pago       = $valor;
-                } else {
-                    $comissaoVendedor->data = $this->calcularData($data_vigencia, $dia, $comissao_corretor_contagem);
-                }
-
-                $comissaoVendedor->save();
-                $comissao_corretor_contagem++;
-            }
+            $comissaoVendedor->save();
+            $contagem++;
         }
     }
 
@@ -457,7 +447,13 @@ class ProcessSpreadsheet extends Command
             return 0;
         }
 
-        return max(0, ($valorPago - 35) * (float) $config->valor / 100);
+        // Base = SEMPRE o valor_plano do contrato (mensalidade, sem taxa de adesao)
+        $base = (float) Contrato::where('id', $comissao->contrato_id)->value('valor_plano');
+        if ($base <= 0) {
+            $base = $valorPago - 35;
+        }
+
+        return max(0, $base * (float) $config->valor / 100);
     }
 
     private function calcularData($data_vigencia, $dia, $meses)

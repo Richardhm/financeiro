@@ -1953,8 +1953,12 @@ class HomeController extends Controller
         // ── KPIs do corretor ──────────────────────────────────────────────────
         $kpis = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'c.id', '=', 'ccl.comissoes_id')
+            ->leftJoin('contratos as ctk', 'ctk.id', '=', 'c.contrato_id')
+            ->leftJoin('contrato_empresarial as cek', 'cek.id', '=', 'c.contrato_empresarial_id')
             ->where('c.corretora_id', $corretoraId)
             ->where('c.user_id', $id)
+            // Ignora comissoes orfas (sem contrato existente) — lixo herdado do sistema antigo
+            ->where(function ($q) { $q->whereNotNull('ctk.id')->orWhereNotNull('cek.id'); })
             ->where(function ($q) { $q->where('ccl.cancelados', 0)->orWhereNull('ccl.cancelados'); })
             ->selectRaw("
                 COUNT(DISTINCT ccl.comissoes_id) AS total_contratos,
@@ -2000,7 +2004,7 @@ class HomeController extends Controller
             $empresarialGrafico[] = (float) ($grafico[$key]->empresarial ?? 0);
         }
 
-        // ── Parcelas individuais / coletivas — uma linha por CCL ─────────────
+        // ── Carteira agrupada por CLIENTE (uma linha por contrato) ────────────
         $individual = DB::table('comissoes as c')
             ->join('contratos as ct', 'ct.id', '=', 'c.contrato_id')
             ->join('clientes as cl', 'cl.id', '=', 'ct.cliente_id')
@@ -2009,26 +2013,23 @@ class HomeController extends Controller
             ->where('c.user_id', $id)
             ->where('c.empresarial', 0)
             ->where(function ($q) { $q->where('ccl.cancelados', 0)->orWhereNull('ccl.cancelados'); })
-            ->where(function ($q) {
-                $q->whereRaw('COALESCE(ccl.valor, 0) != 0')
-                  ->orWhereRaw('COALESCE(ccl.valor_corretora, 0) != 0');
-            })
             ->selectRaw("
+                ct.id AS contrato_id,
                 cl.nome,
+                ct.created_at AS cadastro,
                 c.plano_id,
                 ct.valor_plano,
                 (SELECT COUNT(*) + 1 FROM dependentes d WHERE d.cliente_id = ct.cliente_id) AS qtd_vidas,
-                ccl.parcela,
-                ccl.finalizado,
-                ccl.status_gerente,
-                COALESCE(ccl.valor, 0)           AS valor,
-                COALESCE(ccl.valor_corretora, 0) AS valor_corretora
+                SUM(CASE WHEN ccl.finalizado = 0 THEN COALESCE(ccl.valor, 0) ELSE 0 END)                 AS corretor_a_pagar,
+                SUM(CASE WHEN ccl.finalizado = 1 THEN COALESCE(ccl.valor, 0) ELSE 0 END)                 AS corretor_pago,
+                SUM(CASE WHEN ccl.status_gerente = 0 THEN COALESCE(ccl.valor_corretora, 0) ELSE 0 END)   AS corretora_a_receber,
+                SUM(CASE WHEN ccl.status_gerente = 1 THEN COALESCE(ccl.valor_corretora, 0) ELSE 0 END)   AS corretora_recebido
             ")
-            ->orderBy('cl.nome')
-            ->orderBy('ccl.parcela')
+            ->groupBy("ct.id", "cl.nome", "c.plano_id", "ct.valor_plano", "ct.cliente_id", "ct.created_at")
+            ->havingRaw("(corretor_a_pagar + corretor_pago + corretora_a_receber + corretora_recebido) > 0")
+            ->orderByDesc("ct.created_at")
             ->get();
 
-        // ── Parcelas empresariais — uma linha por CCL ─────────────────────────
         $empresarial = DB::table('comissoes as c')
             ->join('contrato_empresarial as ce', 'ce.id', '=', 'c.contrato_empresarial_id')
             ->join('comissoes_corretores_lancadas as ccl', 'ccl.comissoes_id', '=', 'c.id')
@@ -2036,22 +2037,21 @@ class HomeController extends Controller
             ->where('c.user_id', $id)
             ->where('c.empresarial', 1)
             ->where(function ($q) { $q->where('ccl.cancelados', 0)->orWhereNull('ccl.cancelados'); })
-            ->where(function ($q) {
-                $q->whereRaw('COALESCE(ccl.valor, 0) != 0')
-                  ->orWhereRaw('COALESCE(ccl.valor_corretora, 0) != 0');
-            })
             ->selectRaw("
+                ce.id AS contrato_id,
                 ce.razao_social AS nome,
+                ce.created_at AS cadastro,
                 c.plano_id,
                 ce.valor_plano,
-                ccl.parcela,
-                ccl.finalizado,
-                ccl.status_gerente,
-                COALESCE(ccl.valor, 0)           AS valor,
-                COALESCE(ccl.valor_corretora, 0) AS valor_corretora
+                ce.quantidade_vidas AS qtd_vidas,
+                SUM(CASE WHEN ccl.finalizado = 0 THEN COALESCE(ccl.valor, 0) ELSE 0 END)                 AS corretor_a_pagar,
+                SUM(CASE WHEN ccl.finalizado = 1 THEN COALESCE(ccl.valor, 0) ELSE 0 END)                 AS corretor_pago,
+                SUM(CASE WHEN ccl.status_gerente = 0 THEN COALESCE(ccl.valor_corretora, 0) ELSE 0 END)   AS corretora_a_receber,
+                SUM(CASE WHEN ccl.status_gerente = 1 THEN COALESCE(ccl.valor_corretora, 0) ELSE 0 END)   AS corretora_recebido
             ")
-            ->orderBy('ce.razao_social')
-            ->orderBy('ccl.parcela')
+            ->groupBy("ce.id", "ce.razao_social", "c.plano_id", "ce.valor_plano", "ce.quantidade_vidas", "ce.created_at")
+            ->havingRaw("(corretor_a_pagar + corretor_pago + corretora_a_receber + corretora_recebido) > 0")
+            ->orderByDesc("ce.created_at")
             ->get();
 
         return view('dashboard.corretor', compact(
@@ -2059,6 +2059,53 @@ class HomeController extends Controller
             'labelsGrafico', 'individualGrafico', 'coletivoGrafico', 'empresarialGrafico',
             'individual', 'empresarial'
         ));
+    }
+
+    /**
+     * Parcelas de um contrato para a modal do perfil do corretor.
+     * $tipo: 'i' (contratos) | 'e' (contrato_empresarial)
+     */
+    public function parcelasContrato(string $tipo, int $contratoId)
+    {
+        $corretoraId = auth()->user()->corretora_id;
+
+        $parcelas = DB::table('comissoes_corretores_lancadas as ccl')
+            ->join('comissoes as c', 'c.id', '=', 'ccl.comissoes_id')
+            ->where('c.corretora_id', $corretoraId)
+            ->when($tipo === 'e',
+                fn($q) => $q->where('c.contrato_empresarial_id', $contratoId),
+                fn($q) => $q->where('c.contrato_id', $contratoId))
+            ->orderBy('ccl.parcela')
+            ->selectRaw("
+                ccl.parcela,
+                ccl.data,
+                ccl.data_baixa,
+                ccl.data_baixa_gerente,
+                ccl.status_financeiro,
+                ccl.status_gerente,
+                ccl.finalizado,
+                COALESCE(ccl.valor, 0)           AS valor,
+                COALESCE(ccl.valor_corretora, 0) AS valor_corretora
+            ")
+            ->get()
+            ->map(fn($p) => [
+                'parcela'         => (int) $p->parcela,
+                'rotulo'          => (int) $p->parcela === 1 ? 'Adesão' : $p->parcela . 'ª Parcela',
+                'vencimento'      => $p->data ? \Carbon\Carbon::parse($p->data)->format('d/m/Y') : '—',
+                'cliente_pagou'   => (int) $p->status_financeiro === 1,
+                'data_baixa'      => $p->data_baixa ? \Carbon\Carbon::parse($p->data_baixa)->format('d/m/Y') : null,
+                'valor_corretor'  => (float) $p->valor,
+                'corretor_pago'   => (int) $p->finalizado === 1,
+                'valor_corretora' => (float) $p->valor_corretora,
+                'corretora_recebeu' => (int) $p->status_gerente === 1,
+                'data_gerente'    => $p->data_baixa_gerente ? \Carbon\Carbon::parse($p->data_baixa_gerente)->format('d/m/Y') : null,
+            ]);
+
+        if ($parcelas->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'Contrato não encontrado.'], 404);
+        }
+
+        return response()->json(['success' => true, 'parcelas' => $parcelas]);
     }
 
     public function detalheCorretor(int $id)

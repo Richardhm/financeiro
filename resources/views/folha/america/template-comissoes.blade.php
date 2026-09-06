@@ -1,4 +1,7 @@
 <x-app-layout>
+@section('css')
+    <link rel="stylesheet" href="{{ asset('css/estilo-financeiro.css') }}"/>
+@endsection
     <div class="p-4 max-w-5xl mx-auto">
 
         {{-- Cabeçalho --}}
@@ -166,11 +169,11 @@
     <script>
         // Parcelas por plano_id
         const parcelasPorPlano = {
-            1: 4,   // Individual
+            1: 6,   // Individual
             3: 7,   // Coletivo
-            5: 1,   // Super Simples
+            5: 6,   // Super Simples
         };
-        const DEFAULT_PARCELAS = 4;
+        const DEFAULT_PARCELAS = 6;
 
         const selPlano     = document.getElementById('sel-plano');
         const areaParcelas = document.getElementById('area-parcelas');

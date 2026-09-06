@@ -19,6 +19,8 @@ class HapvidaEmpresarialPdfParser
         'NOVEMBRO'=>'11','DEZEMBRO'=>'12',
     ];
 
+    private const UF_REGEX = '(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)';
+
     private const UF_MAP = [
         'ACRE'=>'AC','ALAGOAS'=>'AL','AMAPA'=>'AP','AMAZONAS'=>'AM',
         'BAHIA'=>'BA','CEARA'=>'CE','DISTRITOFEDERAL'=>'DF','ESPIRITOSANTO'=>'ES',
@@ -95,6 +97,14 @@ class HapvidaEmpresarialPdfParser
         if (preg_match('/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/', $this->page3, $m)) {
             return $m[1];
         }
+        // CAEPF (produtor rural / CPF-base): 341.990.980/007-77
+        if (preg_match('/(\d{3}\.\d{3}\.\d{3}\/\d{3}-\d{2})/', $this->page3, $m)) {
+            return $m[1];
+        }
+        // Ultimo recurso: CPF simples
+        if (preg_match('/(\d{3}\.\d{3}\.\d{3}-\d{2})/', $this->page3, $m)) {
+            return $m[1];
+        }
         return '';
     }
 
@@ -109,6 +119,18 @@ class HapvidaEmpresarialPdfParser
         )) {
             return trim($m[1]);
         }
+        // CAEPF: nome vem apos o CAEPF, endereco pode ser rodovia (ex.: "GO 139 KM 30")
+        if (preg_match(
+            '/\d{3}\.\d{3}\.\d{3}\/\d{3}-\d{2}\s+([A-ZÁÉÍÓÚÃÕÂÊÎÇ][A-ZÁÉÍÓÚÃÕÂÊÎÇ ]+?)\s+(?:' . $keywords . '|[A-Z]{2}\s?\d|\d)/u',
+            $this->page3, $m
+        )) {
+            return trim($m[1]);
+        }
+        // Fallback: responsavel (no CAEPF a razao social e a propria pessoa)
+        $resp = $this->extractResponsavel();
+        if ($resp !== '') {
+            return $resp;
+        }
         return '';
     }
 
@@ -117,6 +139,10 @@ class HapvidaEmpresarialPdfParser
         // Format A: 8 digits  |  Format B: 74.840-460
         if (preg_match('/\b(\d{2}\.\d{3}-\d{3})\b/', $this->page3, $m)) {
             return preg_replace('/\D/', '', $m[1]); // return as 8 digits
+        }
+        // Prefere o CEP seguido de cidade + UF valida (evita pegar fragmentos de CNPJ)
+        if (preg_match('/\b(\d{8})\b\s+[A-ZÁÉÍÓÚÃÕÂÊÎÇ][A-ZÁÉÍÓÚÃÕÂÊÎÇ ]+?\s+' . self::UF_REGEX . '\b/u', $this->page3, $m)) {
+            return $m[1];
         }
         if (preg_match('/\b(\d{8})\b/', $this->page3, $m)) {
             return $m[1];
@@ -132,7 +158,11 @@ class HapvidaEmpresarialPdfParser
                 return trim($m[1]);
             }
         }
-        // Format A: after 8-digit plain CEP
+        // Format A: after 8-digit plain CEP, cidade termina numa UF VALIDA seguida
+        // de telefone/numero/fim (evita cortar "SAO MIGUEL DO PASSA QUATRO" em "DO")
+        if (preg_match('/\b\d{8}\b\s+([A-ZÁÉÍÓÚÃÕÂÊÎÇ][A-ZÁÉÍÓÚÃÕÂÊÎÇ ]+?)\s+' . self::UF_REGEX . '\s*(?=\(|\d|$)/u', $this->page3, $m)) {
+            return trim($m[1]);
+        }
         if (preg_match('/\b\d{8}\b\s+([A-Z][A-Z ]+?)\s+[A-Z]{2}\b/', $this->page3, $m)) {
             return trim($m[1]);
         }
@@ -147,6 +177,9 @@ class HapvidaEmpresarialPdfParser
                 return $this->normalizeUf($m[1]);
             }
         }
+        if (preg_match('/\b\d{8}\b\s+[A-ZÁÉÍÓÚÃÕÂÊÎÇ][A-ZÁÉÍÓÚÃÕÂÊÎÇ ]+?\s+' . self::UF_REGEX . '\s*(?=\(|\d|$)/u', $this->page3, $m)) {
+            return $m[1];
+        }
         if (preg_match('/\b\d{8}\b\s+[A-Z][A-Z ]+?\s+([A-Z]{2})\b/', $this->page3, $m)) {
             return $m[1];
         }
@@ -156,9 +189,9 @@ class HapvidaEmpresarialPdfParser
     private function extractCelular(): string
     {
         if ($this->format === 'B') {
-            // Format B: (62)999309430
-            if (preg_match('/\((\d{2})\)(\d{8,9})/', $this->page3, $m)) {
-                return $m[1] . $m[2];
+            // Format B: (62)999309430 ou (62)99982-7148
+            if (preg_match('/\((\d{2})\)\s?(\d{4,5})-?(\d{4})/', $this->page3, $m)) {
+                return $m[1] . $m[2] . $m[3];
             }
         }
         // Format A: digits after 2-letter UF
@@ -183,6 +216,11 @@ class HapvidaEmpresarialPdfParser
                 return $m[1];
             }
         }
+        // Hibrido: numero de 6 digitos entre os valores e a data por extenso
+        // ex.: "R$ 1.388,68 980352 4 4 3 09 JULHO 2026"
+        if (preg_match('/,\d{2}\s+(\d{6})\b(?:\s+\d{1,2}){0,4}\s+\d{1,2}\s+(?:JANEIRO|FEVEREIRO|MAR[CÇ]O|ABRIL|MAIO|JUNHO|JULHO|AGOSTO|SETEMBRO|OUTUBRO|NOVEMBRO|DEZEMBRO)/iu', $this->page3, $m)) {
+            return $m[1];
+        }
         // Format B: no standard proposta number in this format
         return '';
     }
@@ -195,7 +233,7 @@ class HapvidaEmpresarialPdfParser
             }
         }
         // Format B: name comes after first phone (DD)XXXXXXXX and before CPF
-        if (preg_match('/\(\d{2}\)\d{8,9}\s+([A-ZÁÉÍÓÚÃÕÂÊÎ][A-ZÁÉÍÓÚÃÕÂÊÎ ]+?)\s+\d{3}\.\d{3}\.\d{3}-\d{2}/u', $this->page3, $m)) {
+        if (preg_match('/\(\d{2}\)\s?\d{4,5}-?\d{4}\s+([A-ZÁÉÍÓÚÃÕÂÊÎÇ][A-ZÁÉÍÓÚÃÕÂÊÎÇ ]+?)\s+\d{3}\.\d{3}\.\d{3}-\d{2}/u', $this->page3, $m)) {
             return trim($m[1]);
         }
         return '';
@@ -271,20 +309,22 @@ class HapvidaEmpresarialPdfParser
 
     private function extractMoneyValues(): array
     {
+        // Valores prefixados com R$ tem prioridade em qualquer formato
+        // (captura milhar: R$ 1.258,93 e nao apenas 258,93)
+        if (preg_match_all('/R\$[^\d]*(\d{1,3}(?:\.\d{3})*,\d{2})/u', $this->page3, $m) && count($m[1]) >= 2) {
+            return array_map([$this, 'parseDecimal'], $m[1]);
+        }
+
         if ($this->format === 'A') {
-            // Format A: R$ followed by non-breaking or regular space then number
             preg_match_all('/R\$[^\d]*([\d]+[\d\.]*,\d{2})/u', $this->page3, $m);
             return array_map([$this, 'parseDecimal'], $m[1] ?? []);
         }
 
         // Format B: 4 decimal values appear consecutively without R$ prefix
-        // Pattern: find sequence of N,NN values separated by spaces
-        // They appear as: 723,98 0,00 40,00 763,98
-        if (preg_match_all('/\b(\d{1,7},\d{2})\b/', $this->page3, $m)) {
-            $raw = $m[1];
-            // Remove duplicates, keep the first 4 occurrences that look like money
+        // They appear as: 723,98 0,00 40,00 763,98 (com ou sem milhar: 1.258,93)
+        if (preg_match_all('/(?<![\d.])(\d{1,3}(?:\.\d{3})*,\d{2})\b/', $this->page3, $m)) {
             $vals = [];
-            foreach ($raw as $v) {
+            foreach ($m[1] as $v) {
                 $vals[] = $this->parseDecimal($v);
                 if (count($vals) >= 4) break;
             }
@@ -339,6 +379,11 @@ class HapvidaEmpresarialPdfParser
             if (preg_match('/Cód\. ANS - Saúde\s+(\d+)/u', $this->page4, $m)) {
                 return $m[1];
             }
+        }
+        // Prefere o ANS que aparece na lista de beneficiarios (plano contratado)
+        $ansBenef = $this->extractAnsBeneficiarios();
+        if ($ansBenef !== '') {
+            return preg_replace('/\D/', '', $ansBenef);
         }
         // Format B: ANS code in format 487.823/20-0 → strip to digits
         if (preg_match('/(\d{3}\.\d{3}\/\d{2}-\d{1})/', $this->page3, $m)) {
@@ -466,10 +511,14 @@ class HapvidaEmpresarialPdfParser
     {
         if (empty($this->pageBenef)) return [];
 
+        // O layout da pagina de beneficiarios independe do formato da pagina 3
+        // (ha PDFs hibridos) — tenta os dois e usa o que encontrar registros
+        $a = $this->extractBeneficiariosFormatA();
+        $b = $this->extractBeneficiariosFormatB();
         if ($this->format === 'A') {
-            return $this->extractBeneficiariosFormatA();
+            return count($a) ? $a : $b;
         }
-        return $this->extractBeneficiariosFormatB();
+        return count($b) ? $b : $a;
     }
 
     private function extractBeneficiariosFormatA(): array
@@ -515,6 +564,11 @@ class HapvidaEmpresarialPdfParser
     {
         if (preg_match('/\d{3}\.\d{3}\.\d{3}-\d{2}\s+[A-ZÁÉÍÓÚÃÕÂÊÎ\s]+?\s+\d{2}\/\d{2}\/\d{4}.*?(\d{3}\.\d{3}\/\d{2}-\d)/us', $this->pageBenef, $m)) {
             return $m[1];
+        }
+        // Layout com ANS em digitos corridos (ex.: 487815209) — devolve formatado
+        if (preg_match('/\d{3}\.\d{3}\.\d{3}-\d{2}.{0,20}?[A-ZÁÉÍÓÚÃÕÂÊÎ\s]+?\s+[TD]\s+\d{2}\/\d{2}\/\d{4}.*?\b(\d{9})\b/us', $this->pageBenef, $m)) {
+            $d = $m[1];
+            return substr($d, 0, 3) . '.' . substr($d, 3, 3) . '/' . substr($d, 6, 2) . '-' . substr($d, 8, 1);
         }
         return '';
     }

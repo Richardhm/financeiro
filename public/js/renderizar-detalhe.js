@@ -337,17 +337,15 @@ function renderizarHeader(data, corretorId) {
             </div>
         </div>`;
 
-    // ── Estorno (oculto em PARCEIROS_MODE) ──
-    if (!modoP) {
-        header += `
-            <div class="bg-red-500 text-white rounded shadow-md px-1.5 py-1 hover:cursor-pointer flex-1 min-w-0" data-plano="estorno">
-                <h4 class="text-[11px] font-semibold leading-tight">Estorno</h4>
-                <div class="text-[10px] mt-0.5 leading-snug">
-                    <div><strong>Contr.:</strong> ${data.resumo.estorno?.total_registros || 0}</div>
-                    <div><strong>Total:</strong> <span class="font-bold">${formatMoney(data.resumo.estorno?.total_estorno || 0)}</span></div>
-                </div>
-            </div>`;
-    }
+    // ── Estorno (visivel tambem em PARCEIROS_MODE: estornos descontam da folha do parceiro) ──
+    header += `
+        <div class="bg-red-500 text-white rounded shadow-md px-1.5 py-1 hover:cursor-pointer flex-1 min-w-0" data-plano="estorno">
+            <h4 class="text-[11px] font-semibold leading-tight">Estorno</h4>
+            <div class="text-[10px] mt-0.5 leading-snug">
+                <div><strong>Contr.:</strong> ${data.resumo.estorno?.total_registros || 0}</div>
+                <div><strong>Total:</strong> <span class="font-bold">${formatMoney(data.resumo.estorno?.total_estorno || 0)}</span></div>
+            </div>
+        </div>`;
 
     // ── Não Recebido ──
     header += `
@@ -384,7 +382,6 @@ function renderizarTabelaPrincipal(data) {
             <table id="table-clientes" class="table-auto border-collapse border border-gray-700 w-full text-sm text-left text-gray-400">
                 <thead class="bg-gray-700 text-gray-300 text-xs">
                     <tr>
-                        <th class="px-4 py-2 border border-gray-600">Admin</th>
                         <th class="px-4 py-2 border border-gray-600">Data</th>
                         <th class="px-4 py-2 border border-gray-600">Cod.</th>
                         <th class="px-4 py-2 border border-gray-600">Cliente</th>
@@ -411,7 +408,6 @@ function renderizarTabelaPrincipal(data) {
         const pct = !isNaN(parseInt(cliente.porcentagem)) ? parseInt(cliente.porcentagem) + '%' : '-';
 
         html += `<tr class="${rowClass} hover:bg-gray-600 transition-fast cliente-row text-xs">
-            <td class="px-3 py-2 border border-gray-600 text-white text-xs">${cliente.administradora}</td>
             <td class="px-3 py-2 border border-gray-600 text-white text-xs">${new Date(cliente.data_cadastro).toLocaleDateString('pt-BR')}</td>
             <td class="px-3 py-2 border border-gray-600 text-white text-xs">${cliente.contrato_codigo || '-'}</td>
             <td class="px-3 py-2 border border-gray-600 text-white text-xs">${cliente.cliente_nome}</td>

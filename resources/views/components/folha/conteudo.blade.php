@@ -74,74 +74,15 @@
                         Atualizar
                     </button>
 
-                    <a href="{{route('folha.america.historico')}}"
-                       class="flex items-center gap-1 px-3 py-1.5 text-sm bg-orange-500 text-white rounded shadow hover:bg-orange-600">
+                    <button id="btn-recalcular-comissoes"
+                            class="flex items-center gap-1 px-3 py-1.5 text-sm bg-teal-600 text-white rounded shadow hover:bg-teal-700">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008Zm0 2.25h.008v.008H8.25V13.5Zm0 2.25h.008v.008H8.25v-.008Zm0 2.25h.008v.008H8.25V18Zm2.498-6.75h.007v.008h-.007v-.008Zm0 2.25h.007v.008h-.007V13.5Zm0 2.25h.007v.008h-.007v-.008Zm0 2.25h.007v.008h-.007V18Zm2.504-6.75h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V13.5Zm0 2.25h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V18Zm2.498-6.75h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V13.5ZM8.25 6h7.5v2.25h-7.5V6ZM12 2.25c-1.892 0-3.758.11-5.593.322C5.307 2.7 4.5 3.65 4.5 4.757V19.5a2.25 2.25 0 0 0 2.25 2.25h10.5a2.25 2.25 0 0 0 2.25-2.25V4.757c0-1.108-.806-2.057-1.907-2.185A48.507 48.507 0 0 0 12 2.25Z" />
                         </svg>
-                        Histórico
-                    </a>
-
-                    <a href="{{ route('folha.america.parceiros.pagamentos') }}"
-                       class="flex items-center gap-1 px-3 py-1.5 text-sm bg-pink-700 text-white rounded shadow hover:bg-pink-800">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
-                        </svg>
-                        Pagar Parceiros
-                    </a>
-
-                    <a href="{{ route('folha.america.folha-parceiros') }}"
-                       class="flex items-center gap-1 px-3 py-1.5 text-sm font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded shadow hover:opacity-90">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
-                        </svg>
-                        Folha Parceiros
-                    </a>
+                        Recalcular Comissões
+                    </button>
                 </fieldset>
 
-                <fieldset class="border-2 border-white/60 rounded px-3 py-2 flex items-center gap-2">
-                    <legend class="text-sm font-semibold text-gray-200 px-1 leading-none">Configurações</legend>
-
-                    <a href="{{ route('folha.america.comissao-corretora') }}"
-                       class="flex items-center gap-1 px-3 py-1.5 text-sm bg-teal-600 text-white rounded shadow hover:bg-teal-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 0 1-2.25 2.25M16.5 7.5V18a2.25 2.25 0 0 0 2.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 0 0 2.25 2.25h13.5M6 7.5h3v3H6v-3Z" />
-                        </svg>
-                        Corretora
-                    </a>
-
-                    <a href="{{ route('folha.america.regras-pj') }}"
-                       class="flex items-center gap-1 px-3 py-1.5 text-sm bg-yellow-600 text-white rounded shadow hover:bg-yellow-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
-                        </svg>
-                        Vendedores PJ
-                    </a>
-
-                    <a href="{{ route('folha.america.faixas-clt') }}"
-                       class="flex items-center gap-1 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded shadow hover:bg-indigo-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
-                        </svg>
-                        Vendedores CLT
-                    </a>
-
-                    <a href="{{ route('folha.america.parceiros-config') }}"
-                       class="flex items-center gap-1 px-3 py-1.5 text-sm bg-purple-700 text-white rounded shadow hover:bg-purple-800">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
-                        </svg>
-                        Parceiros
-                    </a>
-
-                    <a href="{{ route('folha.america.parceiros-config') }}"
-                       class="flex items-center gap-1 px-3 py-1.5 text-sm bg-amber-500 text-white rounded shadow hover:bg-amber-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-                        </svg>
-                        Lembrete
-                    </a>
-                </fieldset>
 
 
         </div>
@@ -204,30 +145,40 @@
 
 
         <!-- Layout Principal -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-1">
+        <style>
+            .folha-grid { display: flex; flex-direction: column; gap: 8px; }
+            @media (min-width: 1024px) {
+                .folha-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); align-items: start; }
+            }
+            /* Fontes compactas: lista de vendedores */
+            #lista-corretores { font-size: 12px; }
+            #lista-corretores .text-sm { font-size: 11px !important; }
+            #lista-corretores .text-xs { font-size: 10px !important; }
+            /* Fontes compactas: tabelas dos detalhes */
+            .folha-grid table { font-size: 10px !important; }
+            .folha-grid table.text-sm { font-size: 10px !important; }
+            .folha-grid table .text-xs { font-size: 10px !important; }
+            .folha-grid table th, .folha-grid table td { padding-top: 4px !important; padding-bottom: 4px !important; }
+        </style>
+        <div class="folha-grid">
 
             <!-- Lista de Corretores -->
-            <div class="lg:col-span-1">
+            <div>
                 <div class="bg-white/10 backdrop-blur-md rounded-xl shadow-lg p-4 animate-fade-in-up" style="animation-delay: 0.7s;">
 
                     <!-- CabeÃ§alho e aÃ§Ãµes -->
                     <div class="border-b border-gray-700">
-                        <div class="flex items-center justify-between">
-                            <div class="flex w-[65%]">
-
-                                <input type="text" id="pesquisa-corretores" placeholder="Pesquisar..."
-                                       class="w-full border border-gray-600 rounded-lg bg-gray-800 text-white text-sm placeholder-gray-400 px-3 py-2 focus:ring focus:ring-blue-500 focus:outline-none">
-                            </div>
-                            <div class="flex items-center space-x-1 w-[33%]">
-                                <button onclick="selecionarTodos()"
-                                        class="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring focus:ring-blue-400">
-                                    Todos
-                                </button>
-                                <button onclick="deselecionarTodos()"
-                                        class="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-lg hover:bg-gray-700 focus:ring focus:ring-gray-400">
-                                    Nenhum
-                                </button>
-                            </div>
+                        <div class="flex items-center gap-1 pb-2">
+                            <input type="text" id="pesquisa-corretores" placeholder="Pesquisar..."
+                                   class="flex-1 min-w-0 border border-gray-600 rounded-lg bg-gray-800 text-white text-sm placeholder-gray-400 px-3 py-1.5 focus:ring focus:ring-blue-500 focus:outline-none">
+                            <button onclick="selecionarTodos()"
+                                    class="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring focus:ring-blue-400 shrink-0">
+                                Todos
+                            </button>
+                            <button onclick="deselecionarTodos()"
+                                    class="px-2 py-1 text-xs font-medium text-white bg-gray-600 rounded-lg hover:bg-gray-700 focus:ring focus:ring-gray-400 shrink-0">
+                                Nenhum
+                            </button>
                         </div>
 
 
@@ -270,7 +221,7 @@
                                                    class="rounded border-gray-600 mr-2 text-blue-500 bg-gray-800 focus:ring focus:ring-blue-500 corretor-checkbox"
                                                    data-corretor-id="{{ $corretor->id }}"
                                                    onchange="toggleCorretor({{ $corretor->id }})">
-                                            <div class="w-10 h-10 rounded-full text-center justify-center flex items-center {{ $corretor->image && file_exists($corretor->image) ? '' : 'bg-gradient-to-r from-blue-500 to-indigo-600' }}">
+                                            <div class="w-6 h-6 rounded-full text-[10px] text-center justify-center flex items-center shrink-0 {{ $corretor->image && file_exists($corretor->image) ? '' : 'bg-gradient-to-r from-blue-500 to-indigo-600' }}">
                                                 @if (!empty($corretor->image) && file_exists($corretor->image))
                                                     <img src="{{ asset($corretor->image) }}" alt="{{ $corretor->name }}" class="w-full h-full bg-white rounded-full object-cover">
                                                 @else
@@ -303,7 +254,9 @@
                         <div id="painel-clt" class="hidden">
                             @forelse($vendedoresClt as $corretor)
                                 @php
-                                    $vidas = (int) $corretor->total_contratos;
+                                    // Vidas da competencia aberta (mesma contagem do recalculo),
+                                    // NAO o total da carteira
+                                    $vidas = (int) (($vidasClt[$corretor->id] ?? null) ?? 0);
                                     $regraClt = isset($faixasClt)
                                         ? $faixasClt->first(fn($f) =>
                                             $vidas >= $f->vidas_min &&
@@ -320,7 +273,7 @@
                                                    class="rounded border-gray-600 mr-2 text-green-500 bg-gray-800 focus:ring focus:ring-green-500 corretor-checkbox"
                                                    data-corretor-id="{{ $corretor->id }}"
                                                    onchange="toggleCorretor({{ $corretor->id }})">
-                                            <div class="w-10 h-10 rounded-full text-center justify-center flex items-center {{ $corretor->image && file_exists($corretor->image) ? '' : 'bg-gradient-to-r from-green-500 to-emerald-600' }}">
+                                            <div class="w-6 h-6 rounded-full text-[10px] text-center justify-center flex items-center shrink-0 {{ $corretor->image && file_exists($corretor->image) ? '' : 'bg-gradient-to-r from-green-500 to-emerald-600' }}">
                                                 @if (!empty($corretor->image) && file_exists($corretor->image))
                                                     <img src="{{ asset($corretor->image) }}" alt="{{ $corretor->name }}" class="w-full h-full bg-white rounded-full object-cover">
                                                 @else
@@ -380,7 +333,7 @@
             </div>
 
             <!-- Detalhes do Corretor -->
-            <div class="lg:col-span-2">
+            <div class="min-w-0">
                 <div class="bg-white/10 backdrop-blur-md rounded-xl shadow-lg animate-fade-in-up" style="animation-delay: 0.8s;">
                     <!-- Estado inicial -->
                     <div id="detalhes-inicial" class="p-8 text-center">
@@ -423,3 +376,100 @@
     </div>
 </div>
 
+
+<script>
+document.getElementById('btn-recalcular-comissoes')?.addEventListener('click', function () {
+    // Mes da folha aberta (pre-selecionado) + 6 meses anteriores a hoje
+    var mesAberto = "{{ isset($dadosMes) ? \Carbon\Carbon::parse($dadosMes)->format('Y-m') : '' }}";
+    var nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    var hoje = new Date();
+    var meses = [];
+    for (var i = 1; i <= 6; i++) {
+        var d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        meses.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+    }
+    if (mesAberto && meses.indexOf(mesAberto) === -1) meses.unshift(mesAberto);
+
+    var checks = meses.map(function (m) {
+        var partes = m.split('-');
+        var rotulo = nomesMes[parseInt(partes[1], 10) - 1] + '/' + partes[0];
+        var marcado = m === mesAberto ? 'checked' : '';
+        var badge = m === mesAberto ? ' <span style="font-size:10px;color:#34d399;">(folha aberta)</span>' : '';
+        return '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #374151;border-radius:8px;cursor:pointer;">' +
+               '<input type="checkbox" class="chk-competencia" value="' + m + '" ' + marcado + ' style="accent-color:#0d9488;width:15px;height:15px;">' +
+               '<span>' + rotulo + badge + '</span></label>';
+    }).join('');
+
+    Swal.fire({
+        title: 'Recalcular comissões',
+        html: '<p style="font-size:13px;color:#94a3b8;margin-bottom:10px;">Escolha os meses: aplica as <b>faixas CLT</b> e as <b>regras de parceiros</b> sobre as parcelas de cada competência (não finaliza nada).</p>' +
+              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left;font-size:13px;">' + checks + '</div>',
+        icon: 'question',
+        background: '#1f2937', color: '#f3f4f6',
+        showCancelButton: true,
+        confirmButtonText: 'Recalcular selecionados',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#0d9488', cancelButtonColor: '#4b5563',
+        width: 520,
+        preConfirm: function () {
+            var sel = Array.from(document.querySelectorAll('.chk-competencia:checked')).map(function (c) { return c.value; });
+            if (!sel.length) { Swal.showValidationMessage('Selecione ao menos um mês'); return false; }
+            return sel;
+        }
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+        var competenciasSelecionadas = r.value;
+
+        Swal.fire({
+            title: 'Recalculando...',
+            background: '#1f2937', color: '#f3f4f6',
+            allowOutsideClick: false, showConfirmButton: false,
+            didOpen: function () { Swal.showLoading(); }
+        });
+
+        fetch("{{ route('folha.america.recalcular-comissoes') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+            },
+            body: JSON.stringify({ competencias: competenciasSelecionadas })
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            if (!data.success) throw new Error(data.message || 'Erro');
+
+            var linhas = (data.recalculados || []).map(function (v) {
+                return '<tr>' +
+                    '<td style="text-align:left;padding:3px 8px;">' + v.competencia + '</td>' +
+                    '<td style="text-align:left;padding:3px 8px;">' + v.vendedor + '</td>' +
+                    '<td style="padding:3px 8px;">' + v.vidas + '</td>' +
+                    '<td style="padding:3px 8px;">' + v.faixa + '</td>' +
+                    '<td style="padding:3px 8px;color:#34d399;font-weight:700;">' + v.percentual + '%</td>' +
+                    '<td style="padding:3px 8px;">' + v.parcelas + '</td>' +
+                '</tr>';
+            }).join('');
+
+            var corpo = linhas
+                ? '<table style="width:100%;font-size:13px;border-collapse:collapse;">' +
+                  '<thead><tr style="color:#94a3b8;font-size:11px;text-transform:uppercase;">' +
+                  '<th style="text-align:left;padding:3px 8px;">Mês</th><th style="text-align:left;padding:3px 8px;">Vendedor</th><th>Vidas</th><th>Faixa</th><th>%</th><th>Parcelas</th>' +
+                  '</tr></thead><tbody>' + linhas + '</tbody></table>'
+                : '<p style="color:#94a3b8;">Nenhum vendedor CLT com parcelas baixadas na competência ' + data.competencia + '.</p>';
+
+            Swal.fire({
+                title: 'Recálculo concluído',
+                html: corpo,
+                icon: linhas ? 'success' : 'info',
+                background: '#1f2937', color: '#f3f4f6',
+                confirmButtonText: 'OK', confirmButtonColor: '#0d9488',
+                width: 560,
+            }).then(function () { window.location.reload(); });
+        })
+        .catch(function (e) {
+            Swal.fire({ icon: 'error', title: 'Erro ao recalcular', text: e.message, background: '#1f2937', color: '#f3f4f6' });
+        });
+    });
+});
+</script>

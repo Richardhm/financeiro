@@ -18,7 +18,7 @@
                 <legend class="fin-legend">Filtros</legend>
                 <div class="fin-filters-group">
                     @if(auth()->user()->can('listar_todos'))
-                        <select id="select_corretoras_empresarial" class="fin-select">
+                        <select id="select_corretoras_empresarial" class="fin-select" style="display:none">
                             <option value="1">Vivaz</option>
                             <option value="2">America</option>
                             <option value="0">GrupoAmerica</option>
@@ -106,12 +106,12 @@
 
                     <ul id="listar_empresarial" class="fin-stats-group list-none m-0 p-0">
                         <li class="fin-stat fin-analise empresarial" id="aguardando_em_analise_empresarial">Em Análise <b class="empresarial_quantidade_em_analise">0</b></li>
-                        <li class="fin-stat fin-p1 empresarial" id="aguardando_pagamento_1_parcela_empresarial">1ª Parcela <b class="empresarial_quantidade_1_parcela">0</b></li>
-                        <li class="fin-stat fin-p2 empresarial" id="aguardando_pagamento_2_parcela_empresarial">2ª Parcela <b class="empresarial_quantidade_2_parcela">0</b></li>
-                        <li class="fin-stat fin-p3 empresarial" id="aguardando_pagamento_3_parcela_empresarial">3ª Parcela <b class="empresarial_quantidade_3_parcela">0</b></li>
-                        <li class="fin-stat fin-p4 empresarial" id="aguardando_pagamento_4_parcela_empresarial">4ª Parcela <b class="empresarial_quantidade_4_parcela">0</b></li>
-                        <li class="fin-stat fin-p5 empresarial" id="aguardando_pagamento_5_parcela_empresarial">5ª Parcela <b class="empresarial_quantidade_5_parcela">0</b></li>
-                        <li class="fin-stat fin-p6 empresarial" id="aguardando_pagamento_6_parcela_empresarial">6ª Parcela <b class="empresarial_quantidade_6_parcela">0</b></li>
+                        <li class="fin-stat fin-p1 empresarial" id="aguardando_pagamento_1_parcela_empresarial">1ª Parc. <b class="empresarial_quantidade_1_parcela">0</b></li>
+                        <li class="fin-stat fin-p2 empresarial" id="aguardando_pagamento_2_parcela_empresarial">2ª Parc. <b class="empresarial_quantidade_2_parcela">0</b></li>
+                        <li class="fin-stat fin-p3 empresarial" id="aguardando_pagamento_3_parcela_empresarial">3ª Parc. <b class="empresarial_quantidade_3_parcela">0</b></li>
+                        <li class="fin-stat fin-p4 empresarial" id="aguardando_pagamento_4_parcela_empresarial">4ª Parc. <b class="empresarial_quantidade_4_parcela">0</b></li>
+                        <li class="fin-stat fin-p5 empresarial" id="aguardando_pagamento_5_parcela_empresarial">5ª Parc. <b class="empresarial_quantidade_5_parcela">0</b></li>
+                        <li class="fin-stat fin-p6 empresarial" id="aguardando_pagamento_6_parcela_empresarial">6ª Parc. <b class="empresarial_quantidade_6_parcela">0</b></li>
                     </ul>
 
                 </div>

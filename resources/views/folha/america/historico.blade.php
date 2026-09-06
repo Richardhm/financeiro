@@ -1,4 +1,7 @@
 <x-app-layout>
+@section('css')
+    <link rel="stylesheet" href="{{ asset('css/estilo-financeiro.css') }}"/>
+@endsection
     @section('scripts')
     <script>
     function toggleMes(id) {
@@ -122,6 +125,7 @@
                                     <th class="px-4 py-2 text-right">Premiação</th>
                                     <th class="px-4 py-2 text-right">Fixo (−)</th>
                                     <th class="px-4 py-2 text-right">Vale (−)</th>
+                                    <th class="px-4 py-2 text-right">Desconto (−)</th>
                                     <th class="px-4 py-2 text-right font-bold text-emerald-300">Líquido</th>
                                     <th class="px-4 py-2 text-center">PDF</th>
                                 </tr>
@@ -160,6 +164,9 @@
                                     <td class="px-4 py-2 text-right text-red-400">
                                         @if($c->vale > 0) R$ {{ number_format($c->vale, 2, ',', '.') }} @else <span class="text-gray-600">—</span> @endif
                                     </td>
+                                    <td class="px-4 py-2 text-right text-red-400">
+                                        @if(($c->total_desconto ?? 0) > 0) R$ {{ number_format($c->total_desconto, 2, ',', '.') }} @else <span class="text-gray-600">—</span> @endif
+                                    </td>
                                     <td class="px-4 py-2 text-right font-bold text-emerald-400">
                                         R$ {{ number_format($c->total_liquido, 2, ',', '.') }}
                                     </td>
@@ -190,6 +197,9 @@
                                     </td>
                                     <td class="px-4 py-2 text-right text-red-400">
                                         R$ {{ number_format($h->corretores->sum('vale'), 2, ',', '.') }}
+                                    </td>
+                                    <td class="px-4 py-2 text-right text-red-400">
+                                        R$ {{ number_format($h->total_desconto ?? 0, 2, ',', '.') }}
                                     </td>
                                     <td class="px-4 py-2 text-right font-bold text-emerald-400">
                                         R$ {{ number_format($h->total_liquido, 2, ',', '.') }}

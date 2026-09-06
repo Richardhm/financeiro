@@ -1,4 +1,7 @@
 <x-app-layout>
+@section('css')
+    <link rel="stylesheet" href="{{ asset('css/estilo-financeiro.css') }}"/>
+@endsection
     @section('scripts')
     <script>
         async function gerarPdf(historicoId, tipo) {

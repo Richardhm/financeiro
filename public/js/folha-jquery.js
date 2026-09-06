@@ -492,8 +492,13 @@ $(document).ready(function(){
 
     function atualizarTotalReceber(valor,desconto,adicionar) {
 
-        const corretorSelecionado = document.querySelector('.corretor-destaque');
+        let corretorSelecionado = document.querySelector('.corretor-destaque');
         if (!corretorSelecionado) return; // Sai da função se nenhum corretor tiver a classe `corretor-destaque`
+
+        // Se o destaque caiu num elemento interno (ex.: checkbox), sobe até o card do corretor
+        if (!corretorSelecionado.querySelector('.total_a_receber')) {
+            corretorSelecionado = corretorSelecionado.closest('.corretor-item') || corretorSelecionado;
+        }
 
         // Localiza o total_a_receber específico do corretor destacado
         const totalElement = corretorSelecionado.querySelector('.total_a_receber');
@@ -501,7 +506,7 @@ $(document).ready(function(){
 
         // Extrai o valor atual do total e remove os caracteres de moeda
         let totalAtual = parseFloat(
-            totalElement.textContent.replace('R$', '').replace('.', '').replace(',', '.')
+            totalElement.textContent.replace('R$', '').replace(/\./g, '').replace(',', '.')
         ) || 0;
 
         // Adiciona ou subtrai no total

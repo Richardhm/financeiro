@@ -1,11 +1,17 @@
 <x-app-layout>
+@section('css')
+    <link rel="stylesheet" href="{{ asset('css/estilo-financeiro.css') }}"/>
+@endsection
 
-    <div class="flex" style="align-items: flex-start;">
+    <div class="mt-2 mx-2">
 
-        <!-- FORM: Editar/Cadastrar (lado esquerdo) -->
-        <div class="w-[35%] mt-2 ml-2 rounded-lg p-2 text-white bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px]">
-            <div>
-                <h2 class="text-2xl text-center">Editar/Cadastrar</h2>
+        <!-- MODAL: Editar/Cadastrar -->
+        <div id="modal-user" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/70 backdrop-blur-sm fechar-modal-user"></div>
+            <div class="relative w-full max-w-xl bg-gray-900 border border-white/10 rounded-2xl shadow-2xl p-5 z-10 text-white max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-3">
+                <h2 id="modal-user-titulo" class="text-xl font-bold">Cadastrar Corretor</h2>
+                <button type="button" class="fechar-modal-user text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
             </div>
 
             <div class="flex justify-between">
@@ -72,16 +78,19 @@
             </fieldset>
 
             <div class="flex gap-2 w-full mt-3">
-                <button type="button" class="text-white bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] border border-white font-medium rounded-lg text-sm px-5 py-2.5 mb-2 flex-1 salvar_user">Salvar</button>
+                <button type="button" class="text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-5 py-2.5 mb-2 flex-1 salvar_user">Salvar</button>
                 <button type="button" class="text-white bg-red-500/40 border border-red-400 font-medium rounded-lg text-sm px-5 py-2.5 mb-2 limpar_form">Limpar</button>
+            </div>
             </div>
         </div>
 
-        <!-- Lado direito: botões + tabela empilhados -->
-        <div class="w-[63%] mt-2 ml-2 flex flex-col gap-2">
+        <!-- Botões + tabela -->
+        <div class="w-full flex flex-col gap-2">
 
             <!-- Card de filtros -->
             <div class="rounded-lg px-3 py-2 text-white bg-[rgba(254,254,254,0.18)] backdrop-blur-[15px] flex gap-2 flex-wrap items-center">
+                <button type="button" id="btn-novo-user" class="text-xs font-bold px-3 py-1.5 rounded text-white transition-all" style="background:#0d9488">+ Cadastrar</button>
+                <div style="border-left:1px solid rgba(255,255,255,0.3);height:22px;margin:0 4px;"></div>
                 <button type="button" id="btn-todos" class="text-xs font-bold px-3 py-1.5 rounded text-white transition-all" style="background:#64748b">Todos</button>
                 <div style="border-left:1px solid rgba(255,255,255,0.3);height:22px;margin:0 4px;"></div>
                 <button type="button" class="btn-filtro-tipo text-xs font-bold px-3 py-1.5 rounded text-white transition-all" style="background:#3b82f6" data-tipo="pj">PJ <span id="count-pj"></span></button>
@@ -175,6 +184,20 @@
                 limparForm();
             });
 
+            function abrirModalUser(titulo) {
+                $('#modal-user-titulo').text(titulo);
+                $('#modal-user').removeClass('hidden').addClass('flex');
+            }
+            function fecharModalUser() {
+                $('#modal-user').addClass('hidden').removeClass('flex');
+            }
+            $('#btn-novo-user').on('click', function () {
+                limparForm();
+                abrirModalUser('Cadastrar Corretor');
+            });
+            $(document).on('click', '.fechar-modal-user', fecharModalUser);
+            $(document).on('keydown', function (e) { if (e.key === 'Escape') fecharModalUser(); });
+
             $("#add-row").on("click", function () {
                 let d = (v) => cidadesUsadas.includes(v) ? 'disabled' : '';
                 $("#form-container").append(`
@@ -242,6 +265,8 @@
                 let nome          = $(this).attr('data-nome');
                 let email         = $(this).attr('data-email');
                 let tipoContrato  = $(this).attr('data-tipo-contrato') || 'pj';
+
+                abrirModalUser('Editar Corretor');
 
                 celular = celular != undefined ? celular : "";
                 $("#name").val(nome);
@@ -624,6 +649,7 @@
                     success:function(res){
                         $(".listar_user").DataTable().ajax.reload();
                         limparForm();
+                        fecharModalUser();
                         Swal.fire('Sucesso!', res.message, 'success');
                     }
                 });

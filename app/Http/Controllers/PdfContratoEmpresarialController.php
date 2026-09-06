@@ -184,7 +184,7 @@ class PdfContratoEmpresarialController extends Controller
             $comissao->save();
 
             // Parcelas
-            $this->lancarComissoesCorretor(
+            $parcelasCriadas = $this->lancarComissoesCorretor(
                 $comissao, $user, $corretora_id,
                 $valor_plano,
                 $request->data_boleto,
@@ -192,6 +192,23 @@ class PdfContratoEmpresarialController extends Controller
                 $qtd_parcelas_dc,
                 $desconto_comissao_665
             );
+
+            // Sem configuracao de comissao nenhuma parcela e criada — bloqueia
+            // com orientacao clara em vez de salvar um contrato sem comissoes
+            if ($parcelasCriadas === 0) {
+                DB::rollBack();
+                $orientacao = $user->tipo_contrato === 'parceiro'
+                    ? 'Cadastre a regra de comissão do parceiro para o plano Super Simples em "Parceiros → Regras de Comissão".'
+                    : 'Cadastre o template de comissão do plano Super Simples / Hapvida em "Templates de Comissão" (geral ou para este vendedor).';
+                return response()->json([
+                    'error' => "Nenhuma parcela de comissão pôde ser criada para {$user->name}. {$orientacao} Depois cadastre o contrato novamente."
+                ], 422);
+            }
+
+            // PJ: vidas contam para a faixa — recalcular o mes do cadastro
+            if ($user->tipo_contrato === 'pj') {
+                \App\Services\PjComissaoService::recalcularMes($user->id, now()->format('Y-m'));
+            }
 
             DB::commit();
         } catch (\Exception $e) {
@@ -268,7 +285,7 @@ class PdfContratoEmpresarialController extends Controller
         float $valor, string $dataBoleto,
         float $descontoOp = 0, int $qtdParcelas = 0,
         bool $descontoComissao665 = false
-    ): void {
+    ): int {
         $calcValor = function(float $pct, int $parcela) use ($valor, $descontoOp, $qtdParcelas, $descontoComissao665): float {
             $base = ($descontoOp > 0 && $qtdParcelas >= 1 && $parcela <= $qtdParcelas)
                 ? $valor * (1 - $descontoOp / 100)
@@ -292,7 +309,8 @@ class PdfContratoEmpresarialController extends Controller
                 ->first();
 
             if (!$regra) {
-                return;
+                \Log::warning("Empresarial PDF: parceiro {$user->id} sem regra de comissao plano 5");
+                return 0;
             }
 
             $percentuais = [
@@ -315,25 +333,8 @@ class PdfContratoEmpresarialController extends Controller
                 $lancada->valor = $pct > 0 ? $calcValor($pct, $contagem) : 0;
                 $lancada->save();
             }
-        } elseif ($user->clt == 1) {
-            $dados = ComissoesCorretoresDefault::where('plano_id', 5)
-                ->where('administradora_id', 4)
-                ->where('corretora_id', $corretoraId)
-                ->orderBy('parcela')
-                ->get();
-
-            foreach ($dados as $c) {
-                $contagem++;
-                $lancada = new ComissoesCorretoresLancadas();
-                $lancada->comissoes_id = $comissao->id;
-                $lancada->parcela      = $c->parcela;
-                $lancada->data         = $contagem === 1
-                    ? $dataBoleto
-                    : date('Y-m-d', strtotime($dataBoleto . '+' . ($contagem - 1) . ' month'));
-                $lancada->valor = $calcValor($c->valor, $contagem);
-                $lancada->save();
-            }
         } else {
+            // CLT e PJ: template do vendedor -> template geral -> default legado
             $configuradas = ComissoesCorretoresConfiguracoes::where('plano_id', 5)
                 ->where('administradora_id', 4)
                 ->where('user_id', $user->id)
@@ -350,17 +351,34 @@ class PdfContratoEmpresarialController extends Controller
                     ->get();
             }
 
+            if ($configuradas->isEmpty()) {
+                $configuradas = ComissoesCorretoresDefault::where('plano_id', 5)
+                    ->where('administradora_id', 4)
+                    ->where('corretora_id', $corretoraId)
+                    ->orderBy('parcela')
+                    ->get();
+            }
+
+            if ($configuradas->isEmpty()) {
+                \Log::warning("Empresarial PDF: sem template de comissao plano 5/adm 4 para user {$user->id} (nem geral)");
+            }
+
+            // Templates podem ter linhas duplicadas por parcela — usa uma por parcela
+            $configuradas = $configuradas->unique('parcela')->sortBy('parcela')->values();
+
             foreach ($configuradas as $c) {
                 $contagem++;
                 $lancada = new ComissoesCorretoresLancadas();
                 $lancada->comissoes_id = $comissao->id;
                 $lancada->parcela      = $c->parcela;
-                $lancada->data         = $contagem === 1
+                $lancada->data         = (int) $c->parcela === 1
                     ? $dataBoleto
-                    : date('Y-m-d', strtotime($dataBoleto . '+' . ($contagem - 1) . ' month'));
-                $lancada->valor = $calcValor($c->valor, $contagem);
+                    : date('Y-m-d', strtotime($dataBoleto . '+' . ((int) $c->parcela - 1) . ' month'));
+                $lancada->valor = $calcValor($c->valor, (int) $c->parcela);
                 $lancada->save();
             }
         }
+
+        return $contagem;
     }
 }

@@ -15,6 +15,15 @@
     <script src="{{asset('js/select2.min.js')}}"></script>
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="stylesheet" href="{{ asset('css/estilo-financeiro.css') }}"/>
+    <style>
+        body { background-image: none !important; }
+        select, select option { color: #fff !important; background-color: #1a2333 !important; }
+        .select2-container--default .select2-selection--single { background-color: #1a2333 !important; border-color: #2d5a8e !important; }
+        .select2-container--default .select2-selection--single .select2-selection__rendered { color: #fff !important; }
+        .select2-dropdown, .select2-results__option { background-color: #1a2333 !important; color: #e0e0e0 !important; }
+        .select2-results__option--highlighted { background-color: #2563eb !important; color: #fff !important; }
+    </style>
 
     <style>
         body {

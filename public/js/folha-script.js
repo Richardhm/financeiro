@@ -105,10 +105,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Delegation para cliques nos itens de corretor
     document.querySelector('.max-h-96').addEventListener('click', (e) => {
-        const corretorItem = e.target.closest('[data-corretor-id]');
+        // Sempre destacar o CARD do corretor (.corretor-item), nunca o checkbox interno
+        const corretorItem = e.target.closest('.corretor-item') || e.target.closest('[data-corretor-id]');
         if(corretorItem) {
             const corretorId = corretorItem.dataset.corretorId;
-            document.querySelectorAll('[data-corretor-id]').forEach(item => {
+            document.querySelectorAll('.corretor-destaque').forEach(item => {
                 item.classList.remove('corretor-destaque');
             });
             corretorItem.classList.add('corretor-destaque');
@@ -272,6 +273,12 @@ async function carregarDetalhesCorretor(corretorId, planoId = '1') {
     } finally {
         DOM.detalhesLoading.classList.add('hidden');
         DOM.detalhesConteudo.classList.remove('hidden');
+        // Destaca o card do conteudo exibido (borda laranja).
+        // Em modo parceiros a visao inicial e o painel "Confirmados", nao o plano Individual.
+        if (window.setActiveCard) {
+            const cardInicial = window.PARCEIROS_MODE ? 'confirmados' : planoId;
+            setTimeout(() => window.setActiveCard(cardInicial), 50);
+        }
     }
 }
 

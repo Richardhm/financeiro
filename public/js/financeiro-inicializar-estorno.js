@@ -53,17 +53,21 @@ function inicializarEstorno() {
             {data:"usuario",name:"usuario"},
             {data:"cateirinha",name:"cateirinha"},
             {
-                data: null, // Para a última coluna (dinâmica)
+                data: null,
                 orderable: false,
                 render: function(data, type, row) {
-                    return `
-                        <select data-id="${row.id}"
-                            class="select-opcoes text-[5px] px-1 py-1 rounded text-black border border-gray-300 bg-gray-50 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
-                            <option value="" class="text-[5px]">(vazio)</option>
-                            <option value="voltar" class="text-[5px]">Voltar</option>
-                            <option value="estornar" class="text-[5px]">Estornar</option>
-                        </select>
-                    `;
+                    var valor = 'R$ ' + parseFloat(row.valor || 0).toFixed(2).replace('.', ',');
+                    var badge;
+                    if (row.status === 'aplicado') {
+                        badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold" style="background:#14532d;color:#86efac;" title="' +
+                            (row.folha_referencia || '') + (row.data_aplicacao ? ' em ' + row.data_aplicacao : '') + '">APLICADO</span>';
+                    } else if (row.status === 'sem_vinculo') {
+                        badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold" style="background:#44403c;color:#d6d3d1;">SEM V&Iacute;NCULO</span>';
+                    } else {
+                        badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold" style="background:#713f12;color:#fde047;">PENDENTE</span>';
+                    }
+                    return '<span class="font-bold mr-2">' + valor + '</span> ' + badge +
+                        ' <span class="text-[9px] ml-1" style="color:#888;">lote ' + (row.lote || '') + '</span>';
                 }
             }
         ],

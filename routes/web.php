@@ -18,11 +18,16 @@ Route::get('/', fn() => redirect()->route('home.index'))->middleware('auth');
 
 Route::middleware('auth')->group(function () {
 
+    /****Area do Vendedor****/
+    Route::get('/meus-clientes', [\App\Http\Controllers\VendedorClientesController::class, 'index'])->name('vendedor.clientes');
+    Route::get('/meus-clientes/parcelas/{tipo}/{id}', [\App\Http\Controllers\VendedorClientesController::class, 'parcelas'])->name('vendedor.clientes.parcelas');
+
     /****Home****/
     Route::get('/', [HomeController::class, 'index'])->name('home.index');
     Route::get('/dashboard', [HomeController::class, 'dashboardFinanceiro'])->name('dashboard');
     Route::get('/dashboard/corretor/{id}', [HomeController::class, 'paginaCorretor'])->name('dashboard.corretor.perfil');
     Route::get('/dashboard/corretor/{id}/json', [HomeController::class, 'detalheCorretor'])->name('dashboard.corretor.detalhe');
+    Route::get('/dashboard/contrato/{tipo}/{contratoId}/parcelas', [HomeController::class, 'parcelasContrato'])->name('dashboard.contrato.parcelas');
     Route::get('/dashboard/balanco', [HomeController::class, 'balancaCorretora'])->name('dashboard.balanco');
     Route::get('/tabela_preco', [HomeController::class, 'search'])->name('orcamento.search.home');
     Route::post('/tabela_preco', [HomeController::class, 'tabelaPrecoResposta'])->name('tabela.preco.resposta');
@@ -63,6 +68,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/contratos/individual',[FinanceiroController::class,'storeIndividual'])->name('individual.store');
     Route::get('/contratos/cadastrar/empresarial',[FinanceiroController::class,'formCreateEmpresarial'])->name('contratos.create.empresarial');
     Route::post('/financeiro/sincronizar_baixas/ja_existente',[FinanceiroController::class,'sincronizarBaixasJaExiste'])->name('financeiro.sincronizar.baixas.jaexiste');
+    Route::get('/financeiro/sincronizar_baixas/progresso/{jobId}',[FinanceiroController::class,'progressoSincronizacao'])->name('financeiro.sincronizar.progresso');
     Route::post('/financeiro/estorno/individual',[FinanceiroController::class,'uploadEstorno'])->name('financeiro.estorno.individual');
     Route::post('/financeiro/estorno/confirmar',[FinanceiroController::class,'confirmarEstorno'])->name('estorno.confirmar');
 
@@ -151,6 +157,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/api/confirmar-comissao', [FolhaAmerica::class, 'confirmarComissao'])->name('folha.america.confirmar-comissao');
         Route::get('/gerente/planos/excel',[FolhaAmerica::class, 'exportarPlanosParaExcel']);
 
+        Route::post('/recalcular-comissoes', [FolhaAmerica::class, 'recalcularComissoes'])->name('recalcular-comissoes');
         Route::get('/historico',[FolhaAmerica::class, 'historicoFolha'])->name('historico');
         Route::get('/historico/pdf',[FolhaAmerica::class, 'gerarPdfHistoricoFolhaClt'])->name('historico.pdf');
 
@@ -184,6 +191,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/parceiros/regras/{id}', [FolhaAmerica::class, 'deletarRegraParceiro'])->name('parceiros.regras.deletar');
 
         Route::get('/comissao-corretora', [FolhaAmerica::class, 'indexComissaoCorretora'])->name('comissao-corretora');
+        Route::get('/comissao-corretora/balanco', [FolhaAmerica::class, 'balancoCorretora'])->name('comissao-corretora.balanco');
         Route::post('/comissao-corretora', [FolhaAmerica::class, 'salvarComissaoCorretora'])->name('comissao-corretora.salvar');
         Route::delete('/comissao-corretora/{id}', [FolhaAmerica::class, 'deletarComissaoCorretora'])->name('comissao-corretora.deletar');
 

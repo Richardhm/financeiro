@@ -12,6 +12,15 @@
     <script src="{{asset('js/select2.min.js')}}"></script>
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="stylesheet" href="{{ asset('css/estilo-financeiro.css') }}"/>
+    <style>
+        body { background-image: none !important; }
+        select, select option { color: #fff !important; background-color: #1a2333 !important; }
+        .select2-container--default .select2-selection--single { background-color: #1a2333 !important; border-color: #2d5a8e !important; }
+        .select2-container--default .select2-selection--single .select2-selection__rendered { color: #fff !important; }
+        .select2-dropdown, .select2-results__option { background-color: #1a2333 !important; color: #e0e0e0 !important; }
+        .select2-results__option--highlighted { background-color: #2563eb !important; color: #fff !important; }
+    </style>
 
     <style>
         body {
@@ -1064,13 +1073,13 @@
 
 
         $("#desconto_corretora_valores").change(function(){
-            let valor = $(this).val().replace(".","").replace(",",".");
-            let total = $(".diferenca_entre_valores").text().replace("R$","").replace(".","").replace(",",".").trim();
-            let corretor = total - valor;
-            let resto_corretor = parseFloat(corretor);
+            // Parse robusto: remove tudo que nao for digito, virgula, ponto ou sinal (inclui o espaco especial do "R$ ")
+            let valor = parseFloat($(this).val().replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
+            let total = parseFloat($(".diferenca_entre_valores").text().replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
+            let resto_corretor = total - valor;
             $("#desconto_corretor_valores").val(resto_corretor.toLocaleString('pt-br',{style: 'currency', currency: 'BRL'}));
-            $("#desconto_corretor").val(resto_corretor);
-            $("#desconto_corretora").val(valor);
+            $("#desconto_corretor").val(resto_corretor.toFixed(2));
+            $("#desconto_corretora").val(valor.toFixed(2));
         });
 
         $(document).on('click', '.close-modal', function() {
@@ -1081,7 +1090,7 @@
 
         $('form[name="cadastrar_pessoa_fisica_formulario_modal_coletivo"]').on('submit',function(e){
             e.preventDefault();
-            let valor_plano = $(".destaque").find('.valor_plano').text().replace("R$ ","").trim();
+            let valor_plano = $(".destaque").find('.aqui_total_change').first().text().replace("R$","").trim();
             $("#valor").val(valor_plano);
             let load = $(".ajax_load");
             $.ajax({

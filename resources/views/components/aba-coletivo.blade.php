@@ -18,7 +18,7 @@
                 <legend class="fin-legend">Filtros</legend>
                 <div class="fin-filters-group">
                     @if(auth()->user()->can('listar_todos'))
-                        <select id="select_corretoras_coletivo" class="fin-select">
+                        <select id="select_corretoras_coletivo" class="fin-select" style="display:none">
                             <option value="1">Vivaz</option>
                             <option value="2">America</option>
                             <option value="0">Grupo America</option>
@@ -109,11 +109,11 @@
                         <li class="fin-stat fin-emissao coletivo" id="emissao_boleto_coletivo">Emissão Boleto <b class="coletivo_quantidade_emissao_boleto">0</b></li>
                         <li class="fin-stat fin-adesao coletivo" id="pagamento_adesao_coletivo">Pag. Adesão <b class="coletivo_quantidade_pagamento_adesao">0</b></li>
                         <li class="fin-stat fin-vigencia coletivo" id="pagamento_vigencia_coletivo">Pag. Vigência <b class="coletivo_quantidade_pagamento_vigencia">0</b></li>
-                        <li class="fin-stat fin-p2 coletivo" id="pagamento_segunda_parcela">2ª Parcela <b class="coletivo_quantidade_segunda_parcela">0</b></li>
-                        <li class="fin-stat fin-p3 coletivo" id="pagamento_terceira_parcela">3ª Parcela <b class="coletivo_quantidade_terceira_parcela">0</b></li>
-                        <li class="fin-stat fin-p4 coletivo" id="pagamento_quarta_parcela">4ª Parcela <b class="coletivo_quantidade_quarta_parcela">0</b></li>
-                        <li class="fin-stat fin-p5 coletivo" id="pagamento_quinta_parcela">5ª Parcela <b class="coletivo_quantidade_quinta_parcela">0</b></li>
-                        <li class="fin-stat fin-p6 coletivo" id="pagamento_sexta_parcela">6ª Parcela <b class="coletivo_quantidade_sexta_parcela">0</b></li>
+                        <li class="fin-stat fin-p2 coletivo" id="pagamento_segunda_parcela">2ª Parc. <b class="coletivo_quantidade_segunda_parcela">0</b></li>
+                        <li class="fin-stat fin-p3 coletivo" id="pagamento_terceira_parcela">3ª Parc. <b class="coletivo_quantidade_terceira_parcela">0</b></li>
+                        <li class="fin-stat fin-p4 coletivo" id="pagamento_quarta_parcela">4ª Parc. <b class="coletivo_quantidade_quarta_parcela">0</b></li>
+                        <li class="fin-stat fin-p5 coletivo" id="pagamento_quinta_parcela">5ª Parc. <b class="coletivo_quantidade_quinta_parcela">0</b></li>
+                        <li class="fin-stat fin-p6 coletivo" id="pagamento_sexta_parcela">6ª Parc. <b class="coletivo_quantidade_sexta_parcela">0</b></li>
                     </ul>
 
                 </div>

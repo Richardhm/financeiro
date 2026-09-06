@@ -1,0 +1,15 @@
+SET FOREIGN_KEY_CHECKS=0;
+ALTER TABLE `codigos` DROP FOREIGN KEY `codigos_administradora_id_foreign`;
+ALTER TABLE `codigos` DROP FOREIGN KEY `codigos_plano_id_foreign`;
+ALTER TABLE `codigos` DROP FOREIGN KEY `codigos_tabela_origens_id_foreign`;
+ALTER TABLE `codigo_ambulatorial` DROP FOREIGN KEY `codigo_ambulatorial_administradora_id_foreign`;
+ALTER TABLE `codigo_ambulatorial` DROP FOREIGN KEY `codigo_ambulatorial_plano_id_foreign`;
+ALTER TABLE `codigo_ambulatorial` DROP FOREIGN KEY `codigo_ambulatorial_tabela_origens_id_foreign`;
+ALTER TABLE `comissoes_corretora_configuracoes` DROP FOREIGN KEY `comissoes_corretora_configuracoes_corretora_id_foreign`;
+ALTER TABLE `comissoes_corretora_lancadas` DROP FOREIGN KEY `comissoes_corretora_lancadas_comissoes_id_foreign`;
+ALTER TABLE `dependentes_empresariais` DROP FOREIGN KEY `dependentes_empresariais_contrato_empresarial_id_foreign`;
+ALTER TABLE `faixas_comissao_clt` DROP FOREIGN KEY `faixas_comissao_clt_corretora_id_foreign`;
+ALTER TABLE `parceiros_config_pagamento` DROP FOREIGN KEY `parceiros_config_pagamento_user_id_foreign`;
+ALTER TABLE `regras_comissao_pj` DROP FOREIGN KEY `regras_comissao_pj_corretora_id_foreign`;
+ALTER TABLE `vidas_mes_vendedor` DROP FOREIGN KEY `vidas_mes_vendedor_user_id_foreign`;
+SET FOREIGN_KEY_CHECKS=1;

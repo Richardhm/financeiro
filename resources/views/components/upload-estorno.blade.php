@@ -8,7 +8,7 @@
             <form action="" method="POST" name="formulario_estorno" id="formulario_estorno" enctype="multipart/form-data">
                 @csrf
                 <label for="arquivo_estorno" class="block text-[10px] font-bold uppercase tracking-widest mb-2" style="color:#3d7ab5;">Arquivo</label>
-                <input type="file" name="arquivo_estorno" id="arquivo_estorno" class="block w-full text-sm rounded-lg px-3 py-2 cursor-pointer" style="background:#141414;border:1px solid #2a3d55;color:#e0e0e0;">
+                <input type="file" accept=".xlsx" name="arquivo_estorno" id="arquivo_estorno" class="block w-full text-sm rounded-lg px-3 py-2 cursor-pointer" style="background:#141414;border:1px solid #2a3d55;color:#e0e0e0;">
             </form>
         </div>
     </div>

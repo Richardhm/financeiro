@@ -26,14 +26,14 @@ class ConfirmacaoPagamentoController extends Controller
             ]);
 
             $filename = uniqid() . ".xlsx";
-            if (!move_uploaded_file($request->file, $filename)) {
+        $filePath = \App\Support\PlanilhaUpload::receber($request->file("file") ?: $request->file, $filename);
+            if (!is_readable($filePath)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Erro ao fazer upload do arquivo.'
                 ], 400);
             }
 
-            $filePath = base_path("public/{$filename}");
             $reader = ReaderEntityFactory::createReaderFromFile($filePath);
             $reader->open($filePath);
 

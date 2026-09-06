@@ -114,94 +114,70 @@ body, .min-h-screen { background:#111 !important; color:#e0e0e0; }
             <table class="pg-table" style="width:100%; border-collapse:collapse;">
                 <thead>
                     <tr>
+                        <th class="pg-th" style="text-align:left;">Cadastro</th>
                         <th class="pg-th" style="text-align:left;">Cliente / Empresa</th>
                         <th class="pg-th" style="text-align:center;">Plano</th>
                         <th class="pg-th" style="text-align:right;">Vidas</th>
-                        <th class="pg-th" style="text-align:right;">Vlr Plano</th>
-                        <th class="pg-th" style="text-align:center;">Parcela</th>
+                        <th class="pg-th" style="text-align:right;">Valor Plano</th>
                         <th class="pg-th" style="text-align:right; border-left:1px solid #2a3d55; color:#fbbf24;">Corretor · A Pagar</th>
                         <th class="pg-th" style="text-align:right; color:#4ade80;">Corretor · Pago</th>
                         <th class="pg-th" style="text-align:right; border-left:1px solid #2a3d55; color:#fbbf24;">Corretora · A Receber</th>
                         <th class="pg-th" style="text-align:right; color:#34d399;">Corretora · Recebido</th>
+                        <th class="pg-th" style="text-align:center;">Ver</th>
                     </tr>
                 </thead>
                 <tbody>
 
-                {{-- Individual (plano_id=1) --}}
-                @foreach($individual as $c)
-                @if($c->plano_id == 1)
-                <tr class="cliente-row plano-individual">
-                    <td class="pg-td" style="font-weight:600;">{{ $c->nome }}</td>
-                    <td class="pg-td" style="text-align:center;"><span class="plano-badge plano-1">Individual</span></td>
-                    <td class="pg-td" style="text-align:right; color:#888;">{{ $c->qtd_vidas }}</td>
-                    <td class="pg-td" style="text-align:right; color:#888;">R$ {{ number_format($c->valor_plano, 2, ',', '.') }}</td>
-                    <td class="pg-td" style="text-align:center; color:#888; font-size:11px;">{{ $c->parcela }}ª</td>
-                    <td class="pg-td" style="text-align:right; border-left:1px solid rgba(42,61,85,.3); color:{{ $c->status_gerente == 0 ? '#fbbf24' : '#444' }};">
-                        {{ $c->finalizado == 0 ? 'R$ '.number_format($c->valor, 2, ',', '.') : '—' }}
-                    </td>
-                    <td class="pg-td" style="text-align:right; color:{{ $c->finalizado == 1 ? '#4ade80' : '#444' }};">
-                        {{ $c->finalizado == 1 ? 'R$ '.number_format($c->valor, 2, ',', '.') : '—' }}
-                    </td>
-                    <td class="pg-td" style="text-align:right; border-left:1px solid rgba(42,61,85,.3); color:{{ $c->status_gerente == 0 ? '#fbbf24' : '#444' }};">
-                        {{ $c->status_gerente == 0 ? 'R$ '.number_format($c->valor_corretora, 2, ',', '.') : '—' }}
-                    </td>
-                    <td class="pg-td" style="text-align:right; color:{{ $c->status_gerente == 1 ? '#34d399' : '#444' }};">
-                        {{ $c->status_gerente == 1 ? 'R$ '.number_format($c->valor_corretora, 2, ',', '.') : '—' }}
-                    </td>
-                </tr>
-                @endif
-                @endforeach
+                @php
+                    $linhas = collect();
+                    foreach ($individual as $c) {
+                        $c->tipo_modal = 'i';
+                        $c->grupo = $c->plano_id == 1 ? 'individual' : 'coletivo';
+                        $linhas->push($c);
+                    }
+                    foreach ($empresarial as $c) {
+                        $c->tipo_modal = 'e';
+                        $c->grupo = 'empresarial';
+                        $linhas->push($c);
+                    }
+                    // Mais novo primeiro (vale tambem para a aba "Todos")
+                    $linhas = $linhas->sortByDesc('cadastro')->values();
+                @endphp
 
-                {{-- Coletivo (plano_id=3) --}}
-                @foreach($individual as $c)
-                @if($c->plano_id == 3)
-                <tr class="cliente-row plano-coletivo" style="display:none;">
+                @foreach($linhas as $c)
+                <tr class="cliente-row plano-{{ $c->grupo }}" @if($c->grupo !== 'individual') style="display:none;" @endif>
+                    <td class="pg-td" style="color:#888; white-space:nowrap;">{{ $c->cadastro ? \Carbon\Carbon::parse($c->cadastro)->format('d/m/Y') : '—' }}</td>
                     <td class="pg-td" style="font-weight:600;">{{ $c->nome }}</td>
-                    <td class="pg-td" style="text-align:center;"><span class="plano-badge plano-3">Coletivo</span></td>
-                    <td class="pg-td" style="text-align:right; color:#888;">{{ $c->qtd_vidas }}</td>
+                    <td class="pg-td" style="text-align:center;">
+                        @if($c->grupo === 'individual')<span class="plano-badge plano-1">Individual</span>
+                        @elseif($c->grupo === 'coletivo')<span class="plano-badge plano-3">Coletivo</span>
+                        @else<span class="plano-badge plano-emp">Empresarial</span>@endif
+                    </td>
+                    <td class="pg-td" style="text-align:right; color:#888;">{{ $c->qtd_vidas ?: '—' }}</td>
                     <td class="pg-td" style="text-align:right; color:#888;">R$ {{ number_format($c->valor_plano, 2, ',', '.') }}</td>
-                    <td class="pg-td" style="text-align:center; color:#888; font-size:11px;">{{ $c->parcela }}ª</td>
-                    <td class="pg-td" style="text-align:right; border-left:1px solid rgba(42,61,85,.3); color:{{ $c->status_gerente == 0 ? '#fbbf24' : '#444' }};">
-                        {{ $c->finalizado == 0 ? 'R$ '.number_format($c->valor, 2, ',', '.') : '—' }}
+                    <td class="pg-td" style="text-align:right; border-left:1px solid rgba(42,61,85,.3); color:{{ $c->corretor_a_pagar > 0 ? '#fbbf24' : '#444' }};">
+                        {{ $c->corretor_a_pagar > 0 ? 'R$ '.number_format($c->corretor_a_pagar, 2, ',', '.') : '—' }}
                     </td>
-                    <td class="pg-td" style="text-align:right; color:{{ $c->finalizado == 1 ? '#4ade80' : '#444' }};">
-                        {{ $c->finalizado == 1 ? 'R$ '.number_format($c->valor, 2, ',', '.') : '—' }}
+                    <td class="pg-td" style="text-align:right; color:{{ $c->corretor_pago > 0 ? '#4ade80' : '#444' }};">
+                        {{ $c->corretor_pago > 0 ? 'R$ '.number_format($c->corretor_pago, 2, ',', '.') : '—' }}
                     </td>
-                    <td class="pg-td" style="text-align:right; border-left:1px solid rgba(42,61,85,.3); color:{{ $c->status_gerente == 0 ? '#fbbf24' : '#444' }};">
-                        {{ $c->status_gerente == 0 ? 'R$ '.number_format($c->valor_corretora, 2, ',', '.') : '—' }}
+                    <td class="pg-td" style="text-align:right; border-left:1px solid rgba(42,61,85,.3); color:{{ $c->corretora_a_receber > 0 ? '#fbbf24' : '#444' }};">
+                        {{ $c->corretora_a_receber > 0 ? 'R$ '.number_format($c->corretora_a_receber, 2, ',', '.') : '—' }}
                     </td>
-                    <td class="pg-td" style="text-align:right; color:{{ $c->status_gerente == 1 ? '#34d399' : '#444' }};">
-                        {{ $c->status_gerente == 1 ? 'R$ '.number_format($c->valor_corretora, 2, ',', '.') : '—' }}
+                    <td class="pg-td" style="text-align:right; color:{{ $c->corretora_recebido > 0 ? '#34d399' : '#444' }};">
+                        {{ $c->corretora_recebido > 0 ? 'R$ '.number_format($c->corretora_recebido, 2, ',', '.') : '—' }}
                     </td>
-                </tr>
-                @endif
-                @endforeach
-
-                {{-- Empresarial --}}
-                @foreach($empresarial as $c)
-                <tr class="cliente-row plano-empresarial" style="display:none;">
-                    <td class="pg-td" style="font-weight:600;">{{ $c->nome }}</td>
-                    <td class="pg-td" style="text-align:center;"><span class="plano-badge plano-emp">Empresarial</span></td>
-                    <td class="pg-td" style="text-align:right; color:#888;">—</td>
-                    <td class="pg-td" style="text-align:right; color:#888;">R$ {{ number_format($c->valor_plano, 2, ',', '.') }}</td>
-                    <td class="pg-td" style="text-align:center; color:#888; font-size:11px;">{{ $c->parcela }}ª</td>
-                    <td class="pg-td" style="text-align:right; border-left:1px solid rgba(42,61,85,.3); color:{{ $c->status_gerente == 0 ? '#fbbf24' : '#444' }};">
-                        {{ $c->finalizado == 0 ? 'R$ '.number_format($c->valor, 2, ',', '.') : '—' }}
-                    </td>
-                    <td class="pg-td" style="text-align:right; color:{{ $c->finalizado == 1 ? '#4ade80' : '#444' }};">
-                        {{ $c->finalizado == 1 ? 'R$ '.number_format($c->valor, 2, ',', '.') : '—' }}
-                    </td>
-                    <td class="pg-td" style="text-align:right; border-left:1px solid rgba(42,61,85,.3); color:{{ $c->status_gerente == 0 ? '#fbbf24' : '#444' }};">
-                        {{ $c->status_gerente == 0 ? 'R$ '.number_format($c->valor_corretora, 2, ',', '.') : '—' }}
-                    </td>
-                    <td class="pg-td" style="text-align:right; color:{{ $c->status_gerente == 1 ? '#34d399' : '#444' }};">
-                        {{ $c->status_gerente == 1 ? 'R$ '.number_format($c->valor_corretora, 2, ',', '.') : '—' }}
+                    <td class="pg-td" style="text-align:center;">
+                        <button class="ver-parcelas" title="Ver parcelas" data-tipo="{{ $c->tipo_modal }}" data-id="{{ $c->contrato_id }}" data-nome="{{ $c->nome }}"
+                                style="background:none; border:none; cursor:pointer; color:#60a5fa; padding:2px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:18px;height:18px;"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                        </button>
                     </td>
                 </tr>
                 @endforeach
 
                 @if($individual->isEmpty() && $empresarial->isEmpty())
-                <tr><td colspan="9" style="padding:30px; text-align:center; color:#888; font-size:13px;">Nenhuma parcela encontrada</td></tr>
+                <tr><td colspan="10" style="padding:30px; text-align:center; color:#888; font-size:13px;">Nenhum cliente encontrado</td></tr>
                 @endif
 
                 </tbody>
@@ -209,6 +185,30 @@ body, .min-h-screen { background:#111 !important; color:#e0e0e0; }
         </div>
     </div>
 
+</div>
+
+{{-- ── Modal de parcelas ── --}}
+<div id="modal-parcelas" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.7); align-items:center; justify-content:center; padding:16px;">
+    <div style="width:100%; max-width:680px; border-radius:12px; overflow:hidden; background:#1e1e1e; border:1px solid #2a3d55; box-shadow:0 20px 60px rgba(0,0,0,.5);">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; background:#0e1a28; border-bottom:1px solid #2a3d55;">
+            <h5 id="modal-titulo" style="margin:0; font-size:13px; font-weight:700; color:#e0e0e0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:12px;">Parcelas</h5>
+            <button id="fechar-modal" style="background:none; border:none; font-size:22px; color:#888; cursor:pointer; line-height:1;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#888'">&times;</button>
+        </div>
+        <div style="padding:14px 18px; max-height:70vh; overflow-y:auto;">
+            <table style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th class="pg-th" style="text-align:left;">Parcela</th>
+                        <th class="pg-th" style="text-align:left;">Vencimento</th>
+                        <th class="pg-th" style="text-align:center;">Cliente Pagou</th>
+                        <th class="pg-th" style="text-align:right; color:#fbbf24;">Corretor</th>
+                        <th class="pg-th" style="text-align:right; color:#34d399;">Corretora</th>
+                    </tr>
+                </thead>
+                <tbody id="modal-corpo"></tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -257,5 +257,52 @@ function trocarTab(tipo) {
     const semDados = document.getElementById('semDados');
     if (semDados) semDados.style.display = visíveis.length === 0 ? '' : 'none';
 }
+
+// ── Modal de parcelas ─────────────────────────────────────────────
+const modalParcelas = document.getElementById('modal-parcelas');
+const fmt = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+document.querySelectorAll('.ver-parcelas').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('modal-titulo').textContent = 'Parcelas — ' + btn.dataset.nome;
+        const corpo = document.getElementById('modal-corpo');
+        corpo.innerHTML = '<tr><td colspan="5" style="padding:24px; text-align:center; color:#888;">Carregando...</td></tr>';
+        modalParcelas.style.display = 'flex';
+        fetch(`{{ url('/dashboard/contrato') }}/${btn.dataset.tipo}/${btn.dataset.id}/parcelas`, { headers: { Accept: 'application/json' } })
+            .then(r => r.json())
+            .then(j => {
+                if (!j.success) { corpo.innerHTML = '<tr><td colspan="5" style="padding:24px; text-align:center; color:#f87171;">Erro ao carregar.</td></tr>'; return; }
+                const totalCorretor  = j.parcelas.reduce((s, p) => s + p.valor_corretor, 0);
+                const totalCorretora = j.parcelas.reduce((s, p) => s + p.valor_corretora, 0);
+                corpo.innerHTML = j.parcelas.map(p => {
+                    const cli = p.cliente_pagou
+                        ? `<span style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; background:rgba(34,197,94,.15); color:#4ade80;">Sim${p.data_baixa ? ' · ' + p.data_baixa : ''}</span>`
+                        : '<span style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; background:rgba(255,255,255,.06); color:#888;">Não</span>';
+                    const cor = p.valor_corretor > 0
+                        ? `<span style="color:${p.corretor_pago ? '#4ade80' : '#fbbf24'};">${fmt(p.valor_corretor)}</span><div style="font-size:9px; color:#666;">${p.corretor_pago ? 'pago' : 'a pagar'}</div>`
+                        : '<span style="color:#444;">—</span>';
+                    const cra = p.valor_corretora > 0
+                        ? `<span style="color:${p.corretora_recebeu ? '#34d399' : '#fbbf24'};">${fmt(p.valor_corretora)}</span><div style="font-size:9px; color:#666;">${p.corretora_recebeu ? 'recebido' + (p.data_gerente ? ' · ' + p.data_gerente : '') : 'a receber'}</div>`
+                        : '<span style="color:#444;">—</span>';
+                    return `<tr>
+                        <td class="pg-td" style="font-weight:600;">${p.rotulo}</td>
+                        <td class="pg-td">${p.vencimento}</td>
+                        <td class="pg-td" style="text-align:center;">${cli}</td>
+                        <td class="pg-td" style="text-align:right;">${cor}</td>
+                        <td class="pg-td" style="text-align:right;">${cra}</td>
+                    </tr>`;
+                }).join('') + `
+                    <tr style="background:rgba(42,61,85,.25);">
+                        <td class="pg-td" colspan="3" style="font-weight:800; text-transform:uppercase; font-size:11px; letter-spacing:.05em; color:#e0e0e0;">Total</td>
+                        <td class="pg-td" style="text-align:right; font-weight:800; color:#fbbf24;">${fmt(totalCorretor)}<div style="font-size:9px; font-weight:600; color:#666;">corretor</div></td>
+                        <td class="pg-td" style="text-align:right; font-weight:800; color:#34d399;">${fmt(totalCorretora)}<div style="font-size:9px; font-weight:600; color:#666;">corretora</div></td>
+                    </tr>`;
+            })
+            .catch(() => { corpo.innerHTML = '<tr><td colspan="5" style="padding:24px; text-align:center; color:#f87171;">Erro ao carregar.</td></tr>'; });
+    });
+});
+
+document.getElementById('fechar-modal').addEventListener('click', () => modalParcelas.style.display = 'none');
+modalParcelas.addEventListener('click', e => { if (e.target === modalParcelas) modalParcelas.style.display = 'none'; });
 </script>
 </x-app-layout>

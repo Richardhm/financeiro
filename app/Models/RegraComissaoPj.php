@@ -13,16 +13,22 @@ class RegraComissaoPj extends Model
         'nome',
         'vidas_min',
         'vidas_max',
+        'parcela_1_pct',
         'parcela_2_pct',
         'parcela_3_pct',
         'parcela_4_pct',
+        'parcela_5_pct',
+        'parcela_6_pct',
     ];
 
     protected $casts = [
         'vidas_min'     => 'integer',
         'vidas_max'     => 'integer',
+        'parcela_1_pct' => 'decimal:2',
         'parcela_2_pct' => 'decimal:2',
         'parcela_3_pct' => 'decimal:2',
         'parcela_4_pct' => 'decimal:2',
+        'parcela_5_pct' => 'decimal:2',
+        'parcela_6_pct' => 'decimal:2',
     ];
 }

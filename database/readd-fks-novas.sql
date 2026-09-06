@@ -1,0 +1,15 @@
+SET FOREIGN_KEY_CHECKS=0;
+ALTER TABLE `codigos` ADD CONSTRAINT `codigos_administradora_id_foreign` FOREIGN KEY (`administradora_id`) REFERENCES `administradoras`(`id`) ON DELETE CASCADE;
+ALTER TABLE `codigos` ADD CONSTRAINT `codigos_plano_id_foreign` FOREIGN KEY (`plano_id`) REFERENCES `planos`(`id`) ON DELETE CASCADE;
+ALTER TABLE `codigos` ADD CONSTRAINT `codigos_tabela_origens_id_foreign` FOREIGN KEY (`tabela_origens_id`) REFERENCES `tabela_origens`(`id`) ON DELETE CASCADE;
+ALTER TABLE `codigo_ambulatorial` ADD CONSTRAINT `codigo_ambulatorial_administradora_id_foreign` FOREIGN KEY (`administradora_id`) REFERENCES `administradoras`(`id`) ON DELETE CASCADE;
+ALTER TABLE `codigo_ambulatorial` ADD CONSTRAINT `codigo_ambulatorial_plano_id_foreign` FOREIGN KEY (`plano_id`) REFERENCES `planos`(`id`) ON DELETE CASCADE;
+ALTER TABLE `codigo_ambulatorial` ADD CONSTRAINT `codigo_ambulatorial_tabela_origens_id_foreign` FOREIGN KEY (`tabela_origens_id`) REFERENCES `tabela_origens`(`id`) ON DELETE CASCADE;
+ALTER TABLE `comissoes_corretora_configuracoes` ADD CONSTRAINT `comissoes_corretora_configuracoes_corretora_id_foreign` FOREIGN KEY (`corretora_id`) REFERENCES `corretoras`(`id`) ON DELETE CASCADE;
+ALTER TABLE `comissoes_corretora_lancadas` ADD CONSTRAINT `comissoes_corretora_lancadas_comissoes_id_foreign` FOREIGN KEY (`comissoes_id`) REFERENCES `comissoes`(`id`) ON DELETE CASCADE;
+ALTER TABLE `dependentes_empresariais` ADD CONSTRAINT `dependentes_empresariais_contrato_empresarial_id_foreign` FOREIGN KEY (`contrato_empresarial_id`) REFERENCES `contrato_empresarial`(`id`) ON DELETE CASCADE;
+ALTER TABLE `faixas_comissao_clt` ADD CONSTRAINT `faixas_comissao_clt_corretora_id_foreign` FOREIGN KEY (`corretora_id`) REFERENCES `corretoras`(`id`) ON DELETE CASCADE;
+ALTER TABLE `parceiros_config_pagamento` ADD CONSTRAINT `parceiros_config_pagamento_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE;
+ALTER TABLE `regras_comissao_pj` ADD CONSTRAINT `regras_comissao_pj_corretora_id_foreign` FOREIGN KEY (`corretora_id`) REFERENCES `corretoras`(`id`) ON DELETE CASCADE;
+ALTER TABLE `vidas_mes_vendedor` ADD CONSTRAINT `vidas_mes_vendedor_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE;
+SET FOREIGN_KEY_CHECKS=1;
