@@ -12,6 +12,13 @@ class HapvidaEmpresarialPdfParser
     private string $pageBenef = '';
     private string $format   = 'A'; // 'A' = DD/MM/YYYY + R$   'B' = DD MONTHNAME YYYY, sem R$
 
+    /**
+     * Valores dos campos de formulário achatados (XObjects/Form), na ordem dos
+     * objetos do PDF. Em alguns PDFs os dados preenchidos vivem nesses XObjects
+     * e o getText() da página os despeja colados no fim — aqui ficam separados.
+     */
+    private array $formFields = [];
+
     private const MONTHS = [
         'JANEIRO'=>'01','FEVEREIRO'=>'02','MARCO'=>'03','MARÇO'=>'03',
         'ABRIL'=>'04','MAIO'=>'05','JUNHO'=>'06','JULHO'=>'07',
@@ -43,6 +50,7 @@ class HapvidaEmpresarialPdfParser
         $this->page4    = $this->normalizeText($total > 3 ? $pages[3]->getText() : '');
         $this->page5    = $this->normalizeText($total > 4 ? $pages[4]->getText() : '');
         $this->pageBenef = $this->normalizeText($this->findBenefPage($pages, $total));
+        $this->formFields = $this->extractFormFields($pdf);
 
         $this->format = $this->detectFormat();
 
@@ -125,6 +133,22 @@ class HapvidaEmpresarialPdfParser
             $this->page3, $m
         )) {
             return trim($m[1]);
+        }
+        // Fallback (layout com campos achatados): o campo cujo texto aparece
+        // logo apos o CNPJ no texto da pagina e a razao social — escolhe o
+        // match mais longo (o mesmo texto pode existir truncado noutro campo)
+        if (preg_match('/(?:\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{3}\.\d{3}\.\d{3}\/\d{3}-\d{2})\s+(.{5,120})/u', $this->page3, $m)) {
+            $resto = trim($m[1]);
+            $melhor = '';
+            foreach ($this->formFields as $campo) {
+                if (mb_strlen($campo) >= 5 && mb_strlen($campo) > mb_strlen($melhor)
+                    && str_starts_with($resto, $campo)) {
+                    $melhor = $campo;
+                }
+            }
+            if ($melhor !== '') {
+                return $melhor;
+            }
         }
         // Fallback: responsavel (no CAEPF a razao social e a propria pessoa)
         $resp = $this->extractResponsavel();
@@ -235,6 +259,22 @@ class HapvidaEmpresarialPdfParser
         // Format B: name comes after first phone (DD)XXXXXXXX and before CPF
         if (preg_match('/\(\d{2}\)\s?\d{4,5}-?\d{4}\s+([A-ZÁÉÍÓÚÃÕÂÊÎÇ][A-ZÁÉÍÓÚÃÕÂÊÎÇ ]+?)\s+\d{3}\.\d{3}\.\d{3}-\d{2}/u', $this->page3, $m)) {
             return trim($m[1]);
+        }
+        // Layout com campos achatados: o card "Dados do responsavel" tem o CPF
+        // mas o nome so aparece junto a assinatura — pega o campo de nome
+        // vizinho ao campo que contem o CPF do responsavel
+        if (preg_match('/(\d{3}\.\d{3}\.\d{3}-\d{2})/', $this->page3, $m)) {
+            $cpfResp = $m[1];
+            foreach ($this->formFields as $i => $campo) {
+                if ($campo !== $cpfResp) continue;
+                foreach ([$i - 1, $i + 1] as $j) {
+                    $viz = $this->formFields[$j] ?? '';
+                    if (preg_match('/^[A-ZÁÉÍÓÚÃÕÂÊÎÇ][A-ZÁÉÍÓÚÃÕÂÊÎÇ ]{5,}$/u', $viz)
+                        && count(preg_split('/\s+/', trim($viz))) >= 2) {
+                        return trim($viz);
+                    }
+                }
+            }
         }
         return '';
     }
@@ -571,6 +611,32 @@ class HapvidaEmpresarialPdfParser
             return substr($d, 0, 3) . '.' . substr($d, 3, 3) . '/' . substr($d, 6, 2) . '-' . substr($d, 8, 1);
         }
         return '';
+    }
+
+    private function extractFormFields($pdf): array
+    {
+        $campos = [];
+        try {
+            foreach ($pdf->getObjects() as $id => $obj) {
+                $h = $obj->getHeader();
+                if (!$h) continue;
+                $st = $h->get('Subtype');
+                if (!$st || (string) $st->getContent() !== 'Form') continue;
+                try {
+                    $t = trim($this->normalizeText($obj->getText()));
+                } catch (\Throwable $e) {
+                    continue;
+                }
+                if ($t === '') continue;
+                // Ordena pela numeracao do objeto (segue a ordem dos campos no PDF)
+                $num = (int) explode('_', (string) $id)[0];
+                $campos[$num] = $t;
+            }
+        } catch (\Throwable $e) {
+            return [];
+        }
+        ksort($campos);
+        return array_values($campos);
     }
 
     private function normalizeUf(string $uf): string
