@@ -199,6 +199,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/template-comissoes', [FolhaAmerica::class, 'salvarTemplateComissoes'])->name('template-comissoes.salvar');
         Route::delete('/template-comissoes', [FolhaAmerica::class, 'deletarTemplateComissoes'])->name('template-comissoes.deletar');
         Route::post('/comissao-corretora/recalcular', [FolhaAmerica::class, 'recalcularValorCorretora'])->name('comissao-corretora.recalcular');
+        Route::post('/estorno/{contrato}/folha', [FolhaAmerica::class, 'toggleEstornoFolha'])->name('estorno.toggle-folha');
 
         Route::get('/parceiros/pagamentos', [FolhaAmerica::class, 'pagamentosParceiros'])->name('parceiros.pagamentos');
         Route::get('/parceiros/pagamentos/preview', [FolhaAmerica::class, 'previewPagamentosParceiros'])->name('parceiros.pagamentos.preview');

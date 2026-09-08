@@ -386,7 +386,7 @@ function renderizarTabelaPrincipal(data) {
                         <th class="px-4 py-2 border border-gray-600">Cod.</th>
                         <th class="px-4 py-2 border border-gray-600">Cliente</th>
                         <th class="px-4 py-2 border border-gray-600">Parcela</th>
-                        <th class="px-4 py-2 border border-gray-600">Vencimento</th>
+                        ${tipo !== 'estorno' ? `<th class="px-4 py-2 border border-gray-600">Vencimento</th>` : ''}
                         <th class="px-4 py-2 border border-gray-600">Valor</th>
                         <th class="px-4 py-2 border border-gray-600">%</th>
                         <th class="px-4 py-2 border border-gray-600">Pagar</th>
@@ -396,6 +396,7 @@ function renderizarTabelaPrincipal(data) {
                         ${naoRec ? `<th class="px-4 py-2 border border-gray-600">Incluir</th>` : ''}
                         ${cols && !modoP && !naoRec ? `<th class="px-4 py-2 border border-gray-600">Folha</th>` : ''}
                         ${modoP && !naoRec && cols ? `<th class="px-4 py-2 border border-gray-600 text-emerald-300">Confirmar</th>` : ''}
+                        ${tipo === 'estorno' ? `<th class="px-4 py-2 border border-gray-600 text-rose-300">Folha</th>` : ''}
                     </tr>
                 </thead>
                 <tbody>`;
@@ -412,7 +413,7 @@ function renderizarTabelaPrincipal(data) {
             <td class="px-3 py-2 border border-gray-600 text-white text-xs">${cliente.contrato_codigo || '-'}</td>
             <td class="px-3 py-2 border border-gray-600 text-white text-xs">${cliente.cliente_nome}</td>
             <td class="px-3 py-2 border border-gray-600 text-white text-xs">${cliente.parcela || '-'}</td>
-            <td class="px-3 py-2 border border-gray-600 text-white text-xs">${new Date(cliente.vencimento).toLocaleDateString('pt-BR')}</td>
+            ${tipo !== 'estorno' ? `<td class="px-3 py-2 border border-gray-600 text-white text-xs">${new Date(cliente.vencimento).toLocaleDateString('pt-BR')}</td>` : ''}
             <td class="px-3 py-2 border border-gray-600 text-white text-xs">${valorPlano}</td>
             <td class="px-3 py-2 border border-gray-600 text-white text-xs">${pct}</td>
             <td class="px-3 py-2 border border-gray-600 text-green-400 font-bold">${formatMoney(cliente.valor_comissao)}</td>
@@ -452,6 +453,10 @@ function renderizarTabelaPrincipal(data) {
                     data-codigo="${cliente.contrato_codigo || ''}"
                     data-vidas="${cliente.quantidade_vidas || 1}"
                     title="Confirmar para folha">＋</button>
+            </td>` : ''}
+            ${tipo === 'estorno' ? `<td class="px-3 py-2 border border-gray-600 text-center">
+                <input type="checkbox" class="chk-estorno-folha" title="Marcar para descontar nesta folha"
+                    data-contrato="${cliente.contrato_id}" ${cliente.estorno_folha == 1 ? 'checked' : ''}>
             </td>` : ''}
         </tr>`;
     });
@@ -870,3 +875,39 @@ async function atualizarTabelaClientes(data) {
     $('#clientes-itens').html(html);
     adicionarFiltroTabelaClientes();
 }
+
+/* ===== ESTORNO: confirmar entrada na folha ===== */
+$(document).on('change', '.chk-estorno-folha', function () {
+    const chk = $(this);
+    const contrato = chk.data('contrato');
+    const marcado = chk.is(':checked');
+    chk.prop('disabled', true);
+    fetch(`/folha/estorno/${contrato}/folha`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+        },
+        body: JSON.stringify({ folha: marcado })
+    })
+    .then(r => r.json())
+    .then(j => {
+        chk.prop('disabled', false);
+        if (!j.success) {
+            chk.prop('checked', !marcado);
+            Swal.fire({ icon: 'error', title: 'Erro', text: j.message || 'Falha ao atualizar estorno', background: '#1f2937', color: '#f3f4f6' });
+            return;
+        }
+        chk.closest('tr').toggleClass('opacity-60', !marcado);
+        // Recarrega o painel do corretor para o total "a receber" refletir o estorno
+        const corretorAtivo = document.querySelector('.corretor-item.ativo, .corretor-item.bg-blue-600, .corretor-item[data-selecionado="1"]');
+        if (typeof atualizarResumoCorretor === 'function' && window.CORRETOR_ATUAL_ID) {
+            atualizarResumoCorretor(window.CORRETOR_ATUAL_ID);
+        }
+    })
+    .catch(() => {
+        chk.prop('disabled', false);
+        chk.prop('checked', !marcado);
+    });
+});

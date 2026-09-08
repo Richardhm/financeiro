@@ -426,6 +426,7 @@ class FolhaAmerica extends Controller
                 ->where('clientes.user_id', $parceiroId)
                 ->where('contratos.estorno', 1)
                 ->whereNotNull('contratos.valor_estorno')
+                ->where("contratos.estorno_folha", 1)
                 ->whereNull('contratos.data_baixa_estorno')
                 ->pluck('contratos.valor_estorno', 'contratos.id');
 
@@ -721,6 +722,8 @@ class FolhaAmerica extends Controller
                     'administradoras.nome as administradora',
                     'ct.codigo_externo as contrato_codigo',
                     'ct.valor_estorno as valor_comissao',
+                    'ct.id as contrato_id',
+                    'ct.estorno_folha',
                     'ct.valor_plano as valor_original_plano',
                     DB::raw('NULL as parcela'),
                     DB::raw('NULL as vencimento'),
@@ -852,45 +855,7 @@ class FolhaAmerica extends Controller
                     'ccl.parcela',
                     'administradoras.nome as administradora',
                     'ccl.data AS vencimento',
-                    DB::raw("
-                      CASE
-                          WHEN ccl.porcentagem_paga IS NOT NULL
-                              THEN ccl.porcentagem_paga
-                          WHEN (SELECT clt FROM users WHERE users.id = c.user_id LIMIT 1) = 1 THEN
-                              (SELECT valor FROM comissoes_corretores_default
-                               WHERE
-                                   comissoes_corretores_default.plano_id = c.plano_id AND
-                                   comissoes_corretores_default.administradora_id = c.administradora_id AND
-                                   comissoes_corretores_default.corretora_id = c.corretora_id AND
-                                   comissoes_corretores_default.parcela = ccl.parcela LIMIT 1)
-                          WHEN EXISTS (
-                              SELECT 1 FROM comissoes_corretores_configuracoes
-                              WHERE
-                                  comissoes_corretores_configuracoes.plano_id = c.plano_id AND
-                                  comissoes_corretores_configuracoes.administradora_id = c.administradora_id AND
-                                  comissoes_corretores_configuracoes.user_id = c.user_id AND
-                                  comissoes_corretores_configuracoes.parcela = ccl.parcela AND
-                                  comissoes_corretores_configuracoes.corretora_id = c.corretora_id
-                                LIMIT 1
-                          ) THEN
-                              (SELECT valor FROM comissoes_corretores_configuracoes
-                               WHERE
-                                   comissoes_corretores_configuracoes.plano_id = c.plano_id AND
-                                   comissoes_corretores_configuracoes.administradora_id = c.administradora_id AND
-                                   comissoes_corretores_configuracoes.user_id = c.user_id AND
-                                   comissoes_corretores_configuracoes.parcela = ccl.parcela AND
-                                   comissoes_corretores_configuracoes.corretora_id = c.corretora_id LIMIT 1)
-
-                          ELSE
-                              (SELECT valor FROM comissoes_corretores_configuracoes
-                               WHERE
-                                   comissoes_corretores_configuracoes.plano_id = c.plano_id AND
-                                   comissoes_corretores_configuracoes.administradora_id = c.administradora_id AND
-                                   comissoes_corretores_configuracoes.parcela = ccl.parcela AND
-                                   comissoes_corretores_configuracoes.corretora_id = c.corretora_id AND
-                                   comissoes_corretores_configuracoes.user_id IS NULL)
-                      END as porcentagem
-                    ")
+                    DB::raw("COALESCE(ccl.porcentagem_paga, ROUND(ccl.valor / NULLIF(ct.valor_plano, 0) * 100, 0)) as porcentagem")
                 );
         } elseif($planoId == 'estorno') {
             // Consulta independente das parcelas: o estorno deve aparecer mesmo quando
@@ -907,6 +872,8 @@ class FolhaAmerica extends Controller
                     'cl.nome as cliente_nome',
                     'cl.cpf',
                     'ct.valor_estorno as valor_comissao',
+                    'ct.id as contrato_id',
+                    'ct.estorno_folha',
                     'ct.codigo_externo as contrato_codigo',
                     'ct.valor_plano as valor_original_plano',
                     DB::raw('ct.valor_plano as valor_plano_ajustado'),
@@ -1031,45 +998,7 @@ class FolhaAmerica extends Controller
                     'ccl.parcela',
                     'administradoras.nome as administradora',
                     'ccl.data AS vencimento',
-                    DB::raw("
-                      CASE
-                          WHEN ccl.porcentagem_paga IS NOT NULL
-                              THEN ccl.porcentagem_paga
-                          WHEN (SELECT clt FROM users WHERE users.id = c.user_id LIMIT 1) = 1 THEN
-                              (SELECT valor FROM comissoes_corretores_default
-                               WHERE
-                                   comissoes_corretores_default.plano_id = c.plano_id AND
-                                   comissoes_corretores_default.administradora_id = c.administradora_id AND
-                                   comissoes_corretores_default.corretora_id = c.corretora_id AND
-                                   comissoes_corretores_default.parcela = ccl.parcela LIMIT 1)
-                          WHEN EXISTS (
-                              SELECT 1 FROM comissoes_corretores_configuracoes
-                              WHERE
-                                  comissoes_corretores_configuracoes.plano_id = c.plano_id AND
-                                  comissoes_corretores_configuracoes.administradora_id = c.administradora_id AND
-                                  comissoes_corretores_configuracoes.user_id = c.user_id AND
-                                  comissoes_corretores_configuracoes.parcela = ccl.parcela AND
-                                  comissoes_corretores_configuracoes.corretora_id = c.corretora_id
-                                LIMIT 1
-                          ) THEN
-                              (SELECT valor FROM comissoes_corretores_configuracoes
-                               WHERE
-                                   comissoes_corretores_configuracoes.plano_id = c.plano_id AND
-                                   comissoes_corretores_configuracoes.administradora_id = c.administradora_id AND
-                                   comissoes_corretores_configuracoes.user_id = c.user_id AND
-                                   comissoes_corretores_configuracoes.parcela = ccl.parcela AND
-                                   comissoes_corretores_configuracoes.corretora_id = c.corretora_id LIMIT 1)
-
-                          ELSE
-                              (SELECT valor FROM comissoes_corretores_configuracoes
-                               WHERE
-                                   comissoes_corretores_configuracoes.plano_id = c.plano_id AND
-                                   comissoes_corretores_configuracoes.administradora_id = c.administradora_id AND
-                                   comissoes_corretores_configuracoes.parcela = ccl.parcela AND
-                                   comissoes_corretores_configuracoes.corretora_id = c.corretora_id AND
-                                   comissoes_corretores_configuracoes.user_id IS NULL)
-                      END as porcentagem
-                    "),
+                    DB::raw("COALESCE(ccl.porcentagem_paga, ROUND(ccl.valor / NULLIF(ct.valor_plano, 0) * 100, 0)) as porcentagem"),
                     DB::raw("
             CASE
                 WHEN ccl.status_financeiro = 1 AND ccl.status_gerente = 0 THEN 'cliente_pago'
@@ -1176,44 +1105,7 @@ class FolhaAmerica extends Controller
                                 ce.valor_plano
                         END as valor_plano_ajustado
                     "),
-                    DB::raw("
-                      CASE
-                          WHEN ccl.porcentagem_paga IS NOT NULL
-                              THEN ccl.porcentagem_paga
-                          WHEN (SELECT clt FROM users WHERE users.id = c.user_id LIMIT 1) = 1 THEN
-                              (SELECT valor FROM comissoes_corretores_default
-                               WHERE
-                                   comissoes_corretores_default.plano_id = c.plano_id AND
-                                   comissoes_corretores_default.administradora_id = c.administradora_id AND
-                                   comissoes_corretores_default.corretora_id = c.corretora_id AND
-                                   comissoes_corretores_default.parcela = ccl.parcela LIMIT 1)
-                          WHEN EXISTS (
-                              SELECT 1 FROM comissoes_corretores_configuracoes
-                              WHERE
-                                  comissoes_corretores_configuracoes.plano_id = c.plano_id AND
-                                  comissoes_corretores_configuracoes.administradora_id = c.administradora_id AND
-                                  comissoes_corretores_configuracoes.user_id = c.user_id AND
-                                  comissoes_corretores_configuracoes.parcela = ccl.parcela AND
-                                  comissoes_corretores_configuracoes.corretora_id = c.corretora_id
-                                  LIMIT 1
-                          ) THEN
-                              (SELECT valor FROM comissoes_corretores_configuracoes
-                               WHERE
-                                   comissoes_corretores_configuracoes.plano_id = c.plano_id AND
-                                   comissoes_corretores_configuracoes.administradora_id = c.administradora_id AND
-                                   comissoes_corretores_configuracoes.user_id = c.user_id AND
-                                   comissoes_corretores_configuracoes.parcela = ccl.parcela AND
-                                   comissoes_corretores_configuracoes.corretora_id = c.corretora_id LIMIT 1)
-                          ELSE
-                              (SELECT valor FROM comissoes_corretores_configuracoes
-                               WHERE
-                                   comissoes_corretores_configuracoes.plano_id = c.plano_id AND
-                                   comissoes_corretores_configuracoes.administradora_id = c.administradora_id AND
-                                   comissoes_corretores_configuracoes.parcela = ccl.parcela AND
-                                   comissoes_corretores_configuracoes.corretora_id = c.corretora_id AND
-                                   comissoes_corretores_configuracoes.user_id IS NULL)
-                      END as porcentagem
-                    ")
+                    DB::raw("COALESCE(ccl.porcentagem_paga, ROUND(ccl.valor / NULLIF(ct.valor_plano, 0) * 100, 0)) as porcentagem")
                 );
         }
         $clientes = $query->where('c.user_id', $corretorId)
@@ -2087,6 +1979,7 @@ class FolhaAmerica extends Controller
                     ->join('clientes', 'contratos.cliente_id', '=', 'clientes.id')
                     ->where('clientes.user_id', $corretorId)
                     ->where('contratos.estorno', 1)
+                    ->where("contratos.estorno_folha", 1)
                     ->whereNull('data_baixa_estorno')
                     ->whereNotNull('contratos.valor_estorno')
                     ->select(
@@ -2315,6 +2208,7 @@ class FolhaAmerica extends Controller
                     ->join('clientes', 'contratos.cliente_id', '=', 'clientes.id')
                     ->where('clientes.user_id', $corretorId)
                     ->where('contratos.estorno', 1)
+                    ->where("contratos.estorno_folha", 1)
                     ->whereNull('data_baixa_estorno')
                     //->where('ccl.folha', 1) // Adicionando o filtro
                     ->whereNotNull('contratos.valor_estorno')
@@ -2655,6 +2549,7 @@ class FolhaAmerica extends Controller
                     ->where('clientes.user_id', $corretorId)
                     ->where('contratos.estorno', 1)
                     ->whereNotNull('contratos.valor_estorno')
+                    ->where("contratos.estorno_folha", 1)
                     ->whereNull('contratos.data_baixa_estorno')
                     ->pluck('contratos.id');
 
@@ -3252,7 +3147,7 @@ class FolhaAmerica extends Controller
             SELECT contratos.id as id_estorno, clientes.user_id, SUM(contratos.valor_estorno) as valor_estorno_total
             FROM contratos
             INNER JOIN clientes ON clientes.id = contratos.cliente_id
-            WHERE contratos.estorno = 1 AND contratos.valor_estorno IS NOT NULL AND contratos.data_baixa_estorno IS NULL
+            WHERE contratos.estorno = 1 AND contratos.valor_estorno IS NOT NULL AND contratos.data_baixa_estorno IS NULL AND contratos.estorno_folha = 1
             GROUP BY clientes.user_id, contratos.id
         ) as est'), 'u.id', '=', 'est.user_id')
 
@@ -3297,6 +3192,7 @@ class FolhaAmerica extends Controller
                         FROM contratos
                         INNER JOIN clientes ON clientes.id = contratos.cliente_id
                         WHERE contratos.estorno = 1
+                          AND contratos.estorno_folha = 1
                           AND contratos.valor_estorno IS NOT NULL
                           AND contratos.data_baixa_estorno IS NULL
                           AND clientes.user_id = u.id
@@ -3415,6 +3311,7 @@ class FolhaAmerica extends Controller
                         FROM contratos
                         INNER JOIN clientes ON clientes.id = contratos.cliente_id
                         WHERE contratos.estorno = 1
+                          AND contratos.estorno_folha = 1
                           AND contratos.valor_estorno IS NOT NULL
                           AND contratos.data_baixa_estorno IS NULL
                           AND clientes.user_id = u.id
@@ -3531,6 +3428,7 @@ class FolhaAmerica extends Controller
                         FROM contratos
                         INNER JOIN clientes ON clientes.id = contratos.cliente_id
                         WHERE contratos.estorno = 1
+                          AND contratos.estorno_folha = 1
                           AND contratos.valor_estorno IS NOT NULL
                           AND contratos.data_baixa_estorno IS NULL
                           AND clientes.user_id = u.id
@@ -3847,6 +3745,30 @@ class FolhaAmerica extends Controller
             'percentual' => $percentual,
             'parcelas'   => $recalculadas,
         ];
+    }
+
+    /**
+     * Backoffice confirma (ou desfaz) a entrada de um estorno pendente na folha.
+     */
+    public function toggleEstornoFolha(Request $request, int $contratoId)
+    {
+        $contrato = DB::table('contratos as ct')
+            ->join('clientes as cl', 'cl.id', '=', 'ct.cliente_id')
+            ->join('users as u', 'u.id', '=', 'cl.user_id')
+            ->where('ct.id', $contratoId)
+            ->where('u.corretora_id', $this->corretora_id)
+            ->where('ct.estorno', 1)
+            ->select('ct.id')
+            ->first();
+
+        if (!$contrato) {
+            return response()->json(['success' => false, 'message' => 'Estorno não encontrado.'], 404);
+        }
+
+        $folha = $request->boolean('folha') ? 1 : 0;
+        DB::table('contratos')->where('id', $contratoId)->update(['estorno_folha' => $folha]);
+
+        return response()->json(['success' => true, 'folha' => $folha]);
     }
 
     public function recalcularComissoes(Request $request)
