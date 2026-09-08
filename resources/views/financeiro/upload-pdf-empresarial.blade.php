@@ -7,11 +7,14 @@
     .card-escuro h2 { font-size: 1.15rem; margin-bottom: 20px; color: #7eb8f7; border-bottom: 1px solid #2e3550; padding-bottom: 10px; }
     .form-group { margin-bottom: 14px; }
     .form-group label { display: block; font-size: 0.82rem; color: #8a9bbb; margin-bottom: 5px; }
-    .form-group input, .form-group select, .form-group textarea {
+    .form-group input:not([type=checkbox]):not([type=radio]), .form-group select, .form-group textarea {
         width: 100%; padding: 9px 12px; border: 1px solid #2e3550;
         border-radius: 6px; background: #252a3a; color: #e0e6f0; font-size: 0.9rem; box-sizing: border-box;
     }
     .form-group input:focus, .form-group select:focus { outline: none; border-color: #4e7ab5; }
+    .form-group input[type=checkbox] {
+        width: 17px; height: 17px; accent-color: #4e7ab5; cursor: pointer; margin: 0;
+    }
     .form-group input[readonly] { opacity: 0.55; cursor: not-allowed; }
     .form-row { display: grid; gap: 12px; }
     .form-row.cols-2 { grid-template-columns: 1fr 1fr; }
@@ -270,7 +273,7 @@
     <div class="form-row">
         <div class="form-group">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#e0e6f0;">
-                <input type="checkbox" name="desconto_comissao_665" value="1" style="width:auto;">
+                <input type="checkbox" name="desconto_comissao_665" value="1">
                 Descontar 6,65% da comissão do vendedor
             </label>
         </div>
