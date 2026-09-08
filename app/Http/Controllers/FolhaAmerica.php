@@ -1105,7 +1105,7 @@ class FolhaAmerica extends Controller
                                 ce.valor_plano
                         END as valor_plano_ajustado
                     "),
-                    DB::raw("COALESCE(ccl.porcentagem_paga, ROUND(ccl.valor / NULLIF(ct.valor_plano, 0) * 100, 0)) as porcentagem")
+                    DB::raw("COALESCE(ccl.porcentagem_paga, ROUND(ccl.valor / NULLIF(ce.valor_plano, 0) * 100, 0)) as porcentagem")
                 );
         }
         $clientes = $query->where('c.user_id', $corretorId)
