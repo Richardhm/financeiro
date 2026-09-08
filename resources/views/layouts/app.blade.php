@@ -217,7 +217,7 @@
 
 
     </style>
-    <link rel="stylesheet" href="{{asset('css/folha.css')}}" />
+    <link rel="stylesheet" href="{{asset('css/folha.css')}}?v={{ @filemtime(public_path('css/folha.css')) }}" />
     @yield('css')
 </head>
 <body class="font-sans antialiased">

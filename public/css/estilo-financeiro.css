@@ -1,12 +1,28 @@
-table.dataTable tbody td {
+table.dataTable tbody td,
+#tabela_individual tbody td,
+#tabela_coletivo tbody td,
+#tabela_empresarial tbody td,
+#tabela_odonto tbody td {
     font-size: 0.65em !important;
     padding: 0px !important;
 }
 
-table.dataTable thead th {
+table.dataTable thead th,
+#tabela_individual thead th,
+#tabela_coletivo thead th,
+#tabela_empresarial thead th,
+#tabela_odonto thead th {
     font-size: 0.78em !important;
     padding: 0px !important;
     color: #c2410c !important;
+}
+
+/* Nomes grudados/longos não devem invadir a coluna vizinha (table-layout:fixed) */
+#tabela_coletivo tbody td,
+#tabela_individual tbody td,
+#tabela_empresarial tbody td {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .dataTables_wrapper .dataTables_paginate .paginate_button {

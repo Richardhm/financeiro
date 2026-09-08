@@ -1,6 +1,6 @@
 <x-app-layout>
     @section('css')
-       <link rel="stylesheet" href="{{asset('css/estilo-financeiro.css')}}"/>
+       <link rel="stylesheet" href="{{asset('css/estilo-financeiro.css')}}?v={{ @filemtime(public_path('css/estilo-financeiro.css')) }}"/>
     @endsection
     <input type="hidden" id="janela_atual" value="aba_individual">
 
@@ -383,18 +383,9 @@
 
         @section('scripts')
 
-            <script src="{{asset('js/financeiro-arquivo.js')}}"></script>
-            <script src="{{asset('js/financeiro-inicializar-individual.js')}}"></script>
-            <script src="{{asset('js/financeiro-inicializar-coletivo.js')}}"></script>
-            <script src="{{asset('js/financeiro-inicializar-empresarial.js')}}"></script>
-
-            <script src="{{asset('js/financeiro-inicializar-odonto.js')}}"></script>
-            <script src="{{asset('js/financeiro-inicializar-estorno.js')}}"></script>
-
-            <script src="{{asset('js/financeiro-click-menus.js')}}"></script>
-            <script src="{{asset('js/financeiro-change-menus.js')}}"></script>
-
-            <script src="{{asset('js/financeiro-parametro-url.js')}}"></script>
+            @foreach(['financeiro-arquivo','financeiro-inicializar-individual','financeiro-inicializar-coletivo','financeiro-inicializar-empresarial','financeiro-inicializar-odonto','financeiro-inicializar-estorno','financeiro-click-menus','financeiro-change-menus','financeiro-parametro-url'] as $finJs)
+                <script src="{{asset("js/$finJs.js")}}?v={{ @filemtime(public_path("js/$finJs.js")) }}"></script>
+            @endforeach
         @endsection
 
 

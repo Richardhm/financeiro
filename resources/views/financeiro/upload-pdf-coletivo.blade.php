@@ -481,6 +481,22 @@ function preencherFormulario(data, adm, adesaoPre) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// ─── CEP → autopreencher endereço (ViaCEP) ───────────────────
+document.getElementById('f-cep').addEventListener('change', function () {
+    const cep = this.value.replace(/\D/g, '');
+    if (cep.length !== 8) return;
+    fetch(`https://viacep.com.br/ws/${cep}/json/`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.erro) return;
+            if (data.logradouro) document.getElementById('f-rua').value    = data.logradouro;
+            if (data.bairro)     document.getElementById('f-bairro').value = data.bairro;
+            if (data.localidade) document.getElementById('f-cidade').value = data.localidade;
+            if (data.uf)         document.getElementById('f-uf').value     = data.uf;
+        })
+        .catch(() => {});
+});
+
 // ─── Verificar diferença de valor ───────────────────────────
 function verificarDiferenca(valorPdf, valorAdesao) {
     const diff = Math.abs(valorPdf - valorAdesao);
