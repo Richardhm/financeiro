@@ -59,12 +59,21 @@ class PdfContratoEmpresarialController extends Controller
         // Resolve tabela_origens by first city from area atuação
         $origem = $this->resolveTabelaOrigem($parsed['tabela_cidade']);
 
+        // Avisa desde o preview se o CNPJ já tem contrato (evita duplicar)
+        $existente = $this->contratoExistentePorCnpj($parsed['cnpj'] ?? '');
+
         return response()->json([
             'parsed'            => $parsed,
             'vendedor'          => $vendedor,
             'tabela_origem_id'  => $origem['id'],
             'tabela_origem_nome'=> $origem['nome'],
             'pdf_token'         => $token,
+            'contrato_existente'=> $existente ? [
+                'id'             => $existente->id,
+                'razao_social'   => $existente->razao_social,
+                'codigo_externo' => $existente->codigo_externo,
+                'cadastrado_em'  => $existente->created_at ? $existente->created_at->format('d/m/Y') : '',
+            ] : null,
         ]);
     }
 
@@ -83,6 +92,18 @@ class PdfContratoEmpresarialController extends Controller
             'taxa_adesao'       => 'nullable|numeric|min:0',
             'valor_boleto'      => 'required|numeric|min:0',
         ]);
+
+        // Trava de duplicidade: um CNPJ com contrato não-cancelado não pode
+        // ser cadastrado de novo (duplicaria comissões e parcelas)
+        $existente = $this->contratoExistentePorCnpj($request->cnpj);
+        if ($existente) {
+            $quando = $existente->created_at ? ' em ' . $existente->created_at->format('d/m/Y') : '';
+            return response()->json([
+                'error' => "Este CNPJ já possui contrato cadastrado{$quando}: "
+                         . "{$existente->razao_social} (contrato #{$existente->id}). "
+                         . "Para recadastrar, exclua ou cancele o contrato existente na aba Empresarial.",
+            ], 422);
+        }
 
         $user         = User::findOrFail($request->usuario_id);
         $corretora_id = $user->corretora_id;
@@ -233,7 +254,56 @@ class PdfContratoEmpresarialController extends Controller
         return Storage::disk('local')->download($contrato->pdf_path, $filename);
     }
 
+    /**
+     * Anexa (ou substitui) a proposta PDF de um contrato empresarial já
+     * cadastrado — para contratos criados manualmente, sem PDF.
+     */
+    public function anexarPdf(int $id, Request $request)
+    {
+        $request->validate(['pdf' => 'required|file|mimes:pdf|max:30720']);
+
+        $contrato = ContratoEmpresarial::where('id', $id)
+            ->where('corretora_id', auth()->user()->corretora_id)
+            ->firstOrFail();
+
+        $cnpjSlug = preg_replace('/\D/', '', (string) $contrato->cnpj) ?: 'contrato' . $contrato->id;
+        $permPath = 'propostas_pdf_emp/' . $cnpjSlug . '_' . now()->format('Ymd_His') . '.pdf';
+        Storage::disk('local')->put($permPath, file_get_contents($request->file('pdf')->getRealPath()));
+
+        // Remove o PDF anterior se estava substituindo
+        if (!empty($contrato->pdf_path) && $contrato->pdf_path !== $permPath
+            && Storage::disk('local')->exists($contrato->pdf_path)) {
+            Storage::disk('local')->delete($contrato->pdf_path);
+        }
+
+        $contrato->pdf_path = $permPath;
+        $contrato->save();
+
+        return response()->json([
+            'success'      => true,
+            'download_url' => route('pdf.empresarial.download', $contrato->id),
+        ]);
+    }
+
     // ─── Private helpers ──────────────────────────────────────
+
+    /**
+     * Contrato empresarial não-cancelado já cadastrado para o CNPJ
+     * (comparação por dígitos — ignora pontuação).
+     */
+    private function contratoExistentePorCnpj(?string $cnpj): ?ContratoEmpresarial
+    {
+        $digits = preg_replace('/\D/', '', (string) $cnpj);
+        if (strlen($digits) < 11) {
+            return null;
+        }
+        return ContratoEmpresarial::whereRaw(
+                "REPLACE(REPLACE(REPLACE(cnpj,'.',''),'-',''),'/','') = ?", [$digits]
+            )
+            ->where('financeiro_id', '!=', 12)
+            ->orderByDesc('id')
+            ->first();
+    }
 
     private function resolveVendedor(string $code, string $nome, int $corretoraId): ?array
     {

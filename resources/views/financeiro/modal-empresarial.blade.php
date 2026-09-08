@@ -479,13 +479,58 @@
                 </button>
                 @endif
                 @if(!empty($dados->pdf_path))
-                <a href="{{ route('pdf.empresarial.download', $id) }}"
+                <a href="{{ route('pdf.empresarial.download', $id) }}" id="btn_baixar_proposta_emp"
                     class="flex-1 text-center text-white bg-teal-600 hover:bg-teal-700 font-medium rounded-full text-sm px-3 py-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="inline-block w-4 h-4 me-1" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                     Baixar Proposta
                 </a>
                 @endif
+                <button type="button" id="btn_anexar_proposta_emp"
+                    class="flex-1 text-white bg-violet-600 hover:bg-violet-700 font-medium rounded-full text-sm px-3 py-2 text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="inline-block w-4 h-4 me-1" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>
+                    {{ empty($dados->pdf_path) ? 'Anexar Proposta (PDF)' : 'Substituir PDF' }}
+                </button>
+                <input type="file" id="input_anexar_proposta_emp" accept=".pdf" style="display:none">
             </div>
+            <script>
+            (function(){
+                var btn   = document.getElementById('btn_anexar_proposta_emp');
+                var input = document.getElementById('input_anexar_proposta_emp');
+                if (!btn || !input) return;
+                btn.addEventListener('click', function(){ input.click(); });
+                input.addEventListener('change', function(){
+                    var file = input.files[0];
+                    if (!file) return;
+                    var rotulo = btn.innerHTML;
+                    btn.innerHTML = 'Enviando...'; btn.disabled = true;
+                    var fd = new FormData();
+                    fd.append('pdf', file);
+                    fetch("{{ route('pdf.empresarial.anexar', $id) }}", {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                        body: fd
+                    })
+                    .then(function(r){ return r.json(); })
+                    .then(function(data){
+                        btn.disabled = false;
+                        if (data.success) {
+                            btn.innerHTML = '&#10003; PDF anexado';
+                            btn.classList.remove('bg-violet-600','hover:bg-violet-700');
+                            btn.classList.add('bg-green-700');
+                            var baixar = document.getElementById('btn_baixar_proposta_emp');
+                            if (!baixar) {
+                                btn.insertAdjacentHTML('beforebegin',
+                                    '<a href="' + data.download_url + '" class="flex-1 text-center text-white bg-teal-600 hover:bg-teal-700 font-medium rounded-full text-sm px-3 py-2">Baixar Proposta</a>');
+                            }
+                        } else {
+                            btn.innerHTML = rotulo;
+                            alert(data.error || (data.errors ? Object.values(data.errors).join('\n') : 'Erro ao anexar o PDF.'));
+                        }
+                    })
+                    .catch(function(e){ btn.disabled = false; btn.innerHTML = rotulo; alert('Erro: ' + e.message); });
+                });
+            })();
+            </script>
 
             <div class="flex justify-between w-full items-center">
                 <div class="flex" style="flex-basis:45%;">

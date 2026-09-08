@@ -85,6 +85,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/contratos/cadastrar/empresarial/pdf/parse',[PdfContratoEmpresarialController::class,'parsePdf'])->name('pdf.empresarial.parse');
     Route::post('/contratos/cadastrar/empresarial/pdf/store',[PdfContratoEmpresarialController::class,'store'])->name('pdf.empresarial.store');
     Route::get('/contratos/empresarial/{id}/pdf/download',[PdfContratoEmpresarialController::class,'downloadPdf'])->name('pdf.empresarial.download');
+    Route::post('/contratos/empresarial/{id}/pdf/anexar',[PdfContratoEmpresarialController::class,'anexarPdf'])->name('pdf.empresarial.anexar');
     Route::post('/contratos/montarPlanos',[FinanceiroController::class,'montarPlanos'])->name('contratos.montarPlanos');
     Route::post('/contratos',[FinanceiroController::class,'store'])->name('contratos.store');
     Route::get('/financeiro/detalhes/coletivo/{id}',[FinanceiroController::class,'detalhesContratoColetivo'])->name('financeiro.detalhes.contrato.coletivo');

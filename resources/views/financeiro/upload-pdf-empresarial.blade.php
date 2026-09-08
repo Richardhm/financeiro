@@ -408,6 +408,23 @@ function preencherFormulario(data) {
     document.getElementById('upload-section').style.display  = 'none';
     document.getElementById('preview-section').style.display = 'block';
     clearMsg();
+
+    // CNPJ já cadastrado — avisa e bloqueia o salvar (o servidor também bloqueia)
+    const btnSalvar = document.getElementById('btn-salvar');
+    if (data.contrato_existente) {
+        const ex = data.contrato_existente;
+        document.getElementById('info-fonte').outerHTML =
+            `<div class="alert-box alert-danger" id="info-fonte"><b>⚠ CNPJ já cadastrado!</b> ` +
+            `Este CNPJ já possui o contrato <b>${esc(ex.razao_social)}</b> (#${ex.id}` +
+            (ex.cadastrado_em ? `, cadastrado em ${ex.cadastrado_em}` : '') + `). ` +
+            `O cadastro está bloqueado para não duplicar comissões — se for recadastro, exclua ou cancele o contrato existente na aba Empresarial.</div>`;
+        if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.style.opacity = '0.5'; btnSalvar.style.cursor = 'not-allowed'; }
+    } else {
+        document.getElementById('info-fonte').outerHTML =
+            '<div class="alert-box alert-info" id="info-fonte">PDF processado. Revise e complete os campos antes de salvar.</div>';
+        if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.style.opacity = ''; btnSalvar.style.cursor = ''; }
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
