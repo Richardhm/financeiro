@@ -29,13 +29,21 @@
                 @csrf
                 @method('PUT')
 
+                @php
+                    $temFoto = auth()->user()->image && file_exists(public_path(auth()->user()->image));
+                @endphp
                 <div class="flex items-center mb-4">
-                    <!-- Imagem atual -->
-                    <div class="w-[30%] h-[30%] rounded-full overflow-hidden mr-4">
+                    <!-- Imagem atual (ou iniciais quando nao ha foto) -->
+                    <div class="mr-4" style="flex-shrink:0;">
                         <img id="profileImage"
-                             src="{{ auth()->user()->image ? asset(auth()->user()->image) : 'https://via.placeholder.com/150' }}"
+                             src="{{ $temFoto ? asset(auth()->user()->image) : '' }}"
                              alt="Foto do perfil"
-                             class="w-full h-full object-cover">
+                             style="width:112px;height:112px;border-radius:50%;object-fit:cover;{{ $temFoto ? '' : 'display:none;' }}">
+                        @unless($temFoto)
+                            <div id="profileInitials">
+                                <x-avatar :user="auth()->user()" :size="112" />
+                            </div>
+                        @endunless
                     </div>
                     <!-- Input de upload -->
                     <div class="w-full ml-2 mr-2">
@@ -96,7 +104,11 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    document.getElementById('profileImage').src = e.target.result;
+                    const img = document.getElementById('profileImage');
+                    img.src = e.target.result;
+                    img.style.display = '';
+                    const iniciais = document.getElementById('profileInitials');
+                    if (iniciais) iniciais.style.display = 'none';
                 };
                 reader.readAsDataURL(file);
             }

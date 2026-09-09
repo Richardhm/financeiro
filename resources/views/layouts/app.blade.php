@@ -269,13 +269,7 @@
     <aside class="fsidebar hidden lg:block">
 
         <div class="fuser">
-            @if(auth()->user()->image)
-                <img src="{{ asset(auth()->user()->image) }}" alt="User">
-            @else
-                <div style="width:34px;height:34px;border-radius:50%;background:#3f3f46;display:flex;align-items:center;justify-content:center;color:#a1a1aa;font-weight:700;font-size:14px;">
-                    {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
-                </div>
-            @endif
+            <x-avatar :user="auth()->user()" :size="34" />
             <div>
                 <p class="fuser-name">{{ auth()->user()->name }}</p>
                 <p class="fuser-role">{{ auth()->user()->email }}</p>
