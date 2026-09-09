@@ -65,8 +65,8 @@ class VendedorClientesController extends Controller
                           JOIN comissoes c2 ON c2.id = ccl.comissoes_id
                           WHERE c2.contrato_id = ct.id AND ccl.status_financeiro = 0) as proximo_vencimento")
             )
-            // Ordem cronologica pela data real da venda
-            ->orderBy('ct.created_at')
+            // Cadastro mais recente primeiro
+            ->orderByDesc('ct.created_at')
             ->get();
 
         return $rows->map(fn($r) => $this->montarLinha($r, 'i'));
@@ -96,7 +96,7 @@ class VendedorClientesController extends Controller
                           JOIN comissoes c2 ON c2.id = ccl.comissoes_id
                           WHERE c2.contrato_empresarial_id = ce.id AND ccl.status_financeiro = 0) as proximo_vencimento")
             )
-            ->orderBy('ce.created_at')
+            ->orderByDesc('ce.created_at')
             ->get();
 
         return $rows->map(fn($r) => $this->montarLinha($r, 'e'));
