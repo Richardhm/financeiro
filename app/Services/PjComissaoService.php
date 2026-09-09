@@ -111,6 +111,15 @@ class PjComissaoService
             ->get()
             ->groupBy('comissoes_id');
 
+        // Mes da folha aberta — parcelas de competencias anteriores que foram
+        // zeradas de proposito (limpeza de 2026-09-05) nao podem ser reativadas
+        $mesFolhaAberta = DB::table('folha_mes')
+            ->where('corretora_id', $corretora_id)
+            ->where('status', 0)
+            ->orderByDesc('mes')
+            ->value('mes');
+        $mesFolhaAberta = $mesFolhaAberta ? Carbon::parse($mesFolhaAberta)->format('Y-m') : null;
+
         foreach ($todasParcelas as $comissaoId => $parcelas) {
             // Base = SEMPRE o valor_plano do contrato (mensalidade, sem taxa de adesão)
             $base = (float) DB::table('comissoes as c')
@@ -122,13 +131,34 @@ class PjComissaoService
             }
             if (!$base || $base <= 0) continue;
 
-            // Zera as parcelas (1-6) antes de aplicar a faixa — PRESERVANDO as
-            // ja finalizadas (pagas ao corretor em folha): historico nao muda
-            $naoFinalizadas = $parcelas->filter(fn($p) => (int) ($p->finalizado ?? 0) !== 1);
-            $idsTodas = $naoFinalizadas->whereIn('parcela', [1, 2, 3, 4, 5, 6])->pluck('id');
+            // Zera as parcelas (1-6) antes de aplicar a faixa — PRESERVANDO:
+            // 1. as ja finalizadas (pagas ao corretor em folha): historico nao muda
+            // 2. as zeradas de proposito em competencias ja encerradas (limpeza
+            //    2026-09-05): baixadas, valor 0, competencia antiga — nao reativa
+            $aplicaveis = $parcelas->filter(function ($p) use ($mesFolhaAberta) {
+                if ((int) ($p->finalizado ?? 0) === 1) {
+                    return false;
+                }
+                if ($mesFolhaAberta
+                    && (int) ($p->status_financeiro ?? 0) === 1
+                    && (float) $p->valor == 0.0
+                    && !empty($p->competencia)
+                    && $p->competencia < $mesFolhaAberta) {
+                    return false;
+                }
+                return true;
+            });
+            $idsTodas = $aplicaveis->whereIn('parcela', [1, 2, 3, 4, 5, 6])->pluck('id');
             if ($idsTodas->isNotEmpty()) {
                 DB::table('comissoes_corretores_lancadas')->whereIn('id', $idsTodas)->update(['valor' => 0, 'porcentagem_paga' => null]);
             }
+
+            // Adiantamento (pct 100) ja pago numa parcela finalizada? Entao nao
+            // reaplicar o 100% em outra posicao — evita adiantamento em dobro
+            // (contratos lancados com a regra antiga, adiantamento na 1a parcela)
+            $temAdiantamentoPago = $parcelas->contains(
+                fn($p) => (int) ($p->finalizado ?? 0) === 1 && (float) $p->valor >= 0.9 * $base
+            );
 
             // Aplica percentuais da faixa nas parcelas 1 a 6
             $campos = [
@@ -142,7 +172,8 @@ class PjComissaoService
             foreach ($campos as $n => $campo) {
                 $pct = (float) ($regra->$campo ?? 0);
                 if ($pct <= 0) continue;
-                $p = $naoFinalizadas->firstWhere('parcela', $n);
+                if ($pct >= 100 && $temAdiantamentoPago) continue;
+                $p = $aplicaveis->firstWhere('parcela', $n);
                 if ($p) {
                     DB::table('comissoes_corretores_lancadas')
                         ->where('id', $p->id)
