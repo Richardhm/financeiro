@@ -70,11 +70,7 @@
                         data-atrasado="{{ $c->atrasado ? 1 : 0 }}">
                         <td class="px-3 py-2 whitespace-nowrap">{{ $c->data }}</td>
                         <td class="px-3 py-2 whitespace-nowrap text-gray-300">{{ $c->codigo }}</td>
-                        <td class="px-3 py-2 font-semibold">{{ $c->nome }}
-                            @if($c->atrasado)
-                                <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white align-middle">{{ $c->dias_atraso }}d atraso</span>
-                            @endif
-                        </td>
+                        <td class="px-3 py-2 font-semibold">{{ $c->nome }}</td>
                         <td class="px-3 py-2 whitespace-nowrap text-gray-300">{{ $c->cpf }}</td>
                         <td class="px-3 py-2 text-center">{{ $c->vidas }}</td>
                         <td class="px-3 py-2 text-right whitespace-nowrap">R$ {{ number_format($c->valor, 2, ',', '.') }}</td>
@@ -85,7 +81,7 @@
                             @elseif($c->status_tipo === 'cancelado')
                                 <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-gray-700 text-gray-300">Cancelado</span>
                             @elseif($c->atrasado)
-                                <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-red-900 text-red-200">{{ $c->status }} — Atrasado</span>
+                                <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-red-900 text-red-200">{{ $c->status }}</span>
                             @elseif($c->status_tipo === 'aguardando')
                                 <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-yellow-900 text-yellow-200">{{ $c->status }}</span>
                             @else
