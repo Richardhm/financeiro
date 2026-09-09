@@ -46,6 +46,16 @@ class HapvidaEmpresarialPdfParser
         $pages  = $pdf->getPages();
         $total  = count($pages);
 
+        // Layout "CONTRATAÇÃO SUPER SIMPLES" (versão 2026.06, assinatura
+        // eletrônica): estrutura própria — dados na página 2 ("Nome do plano"),
+        // beneficiários e assinatura no bloco final. Tratado num caminho
+        // separado. Propostas antigas também dizem "SUPER SIMPLES" na capa,
+        // por isso o discriminador é a página 2.
+        $page2 = $total > 1 ? $this->normalizeText($pages[1]->getText()) : '';
+        if (stripos($page2, 'Nome do plano') !== false && stripos($page2, 'Tot/ plano') !== false) {
+            return $this->parseSuperSimples($pages, $total);
+        }
+
         $this->page3    = $this->normalizeText($total > 2 ? $pages[2]->getText() : '');
         $this->page4    = $this->normalizeText($total > 3 ? $pages[3]->getText() : '');
         $this->page5    = $this->normalizeText($total > 4 ? $pages[4]->getText() : '');
@@ -84,6 +94,134 @@ class HapvidaEmpresarialPdfParser
             'valor_total'         => $this->extractValorTotal(),
             'beneficiarios'       => $this->extractBeneficiarios(),
         ];
+    }
+
+    // ─── Layout SUPER SIMPLES (2026.06, assinatura eletrônica) ──
+
+    private function parseSuperSimples(array $pages, int $total): array
+    {
+        // Página 2: dados da empresa, responsável, plano e valores
+        $p2 = $this->normalizeText($total > 1 ? $pages[1]->getText() : '');
+
+        // Bloco final: beneficiários e página de assinatura (vendedor + data)
+        $benef = '';
+        $assin = '';
+        for ($i = 2; $i < $total; $i++) {
+            $t = $this->normalizeText($pages[$i]->getText());
+            if ($benef === '' && stripos($t, 'BENEFICIÁRIOS(AS) COM TERMO') !== false
+                && preg_match('/\d{3}\.\d{3}\.\d{3}-\d{2}\t/', $t)) {
+                $benef = $t;
+            }
+            if (stripos($t, 'Intermediário entre a operadora') !== false) {
+                $assin = $t;
+            }
+        }
+
+        $dados = [
+            'proposta_nr' => '', 'cnpj' => '', 'razao_social' => '', 'cidade' => '',
+            'uf' => '', 'cep' => '', 'celular' => '', 'email' => '', 'responsavel' => '',
+            'data_vigencia' => '', 'vencimento_dia' => 0, 'data_boleto' => '',
+            'plano_nome_comercial' => '', 'codigo_saude' => '', 'codigo_ans_saude' => '',
+            'codigo_odonto' => '', 'codigo_ans_odonto' => '', 'vidas' => 0,
+            'area_atuacao' => '', 'tabela_cidade' => '', 'codigo_vendedor' => '',
+            'nome_vendedor' => '', 'codigo_corretora' => '',
+            'valor_plano_saude' => '0.00', 'valor_plano_odonto' => '0.00',
+            'taxa_adesao' => '0.00', 'valor_total' => '0.00', 'beneficiarios' => [],
+        ];
+
+        // CNPJ (14 dígitos corridos) seguido da razão social na mesma linha
+        if (preg_match('/(\d{14})\t([^\n]+)/u', $p2, $m)) {
+            $d = $m[1];
+            $dados['cnpj'] = substr($d,0,2).'.'.substr($d,2,3).'.'.substr($d,5,3).'/'.substr($d,8,4).'-'.substr($d,12,2);
+            $dados['razao_social'] = trim($m[2]);
+        }
+
+        if (preg_match('/\b(\d{5}-\d{3})\b/', $p2, $m)) {
+            $dados['cep'] = preg_replace('/\D/', '', $m[1]);
+        }
+        if (preg_match('/\n([A-ZÁÉÍÓÚÃÕÂÊÎÇ][A-ZÁÉÍÓÚÃÕÂÊÎÇ ]+?)\t' . self::UF_REGEX . '\n/u', $p2, $m)) {
+            $dados['cidade'] = trim($m[1]);
+            $dados['uf']     = $m[2];
+            $dados['tabela_cidade'] = trim($m[1]);
+        }
+
+        // Responsável: linha de nome seguida do CPF
+        if (preg_match('/\n([A-ZÁÉÍÓÚÃÕÂÊÎÇ][A-ZÁÉÍÓÚÃÕÂÊÎÇ ]{5,})\n(\d{3}\.\d{3}\.\d{3}-\d{2})\n/u', $p2, $m)) {
+            $dados['responsavel'] = trim($m[1]);
+        }
+
+        // E-mail e telefone vêm colados: "email@x.com(62)99418-5543"
+        if (preg_match('/([a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,})/i', $p2, $m)) {
+            $dados['email'] = strtolower($m[1]);
+        }
+        if (preg_match('/\((\d{2})\)\s?(\d{4,5})-?(\d{4})/', $p2, $m)) {
+            $dados['celular'] = $m[1] . $m[2] . $m[3];
+        }
+
+        if (preg_match('/Nome do plano\s*\n([^\n]+)/u', $p2, $m)) {
+            $dados['plano_nome_comercial'] = trim($m[1]);
+        }
+        if (preg_match('/Reg\.\s*ANS\s*\n(\d{6,12})/u', $p2, $m)) {
+            $dados['codigo_ans_saude'] = $m[1];
+        }
+        if (preg_match('/Vidas\s*\n(\d+)/u', $p2, $m)) {
+            $dados['vidas'] = (int) $m[1];
+        }
+        // Valor único (saúde+odonto integrados no plano)
+        if (preg_match('/Tot\/\s*plano\s*\n([\d\.]+,\d{2})/u', $p2, $m)) {
+            $dados['valor_plano_saude'] = $this->parseDecimal($m[1]);
+            $dados['valor_total']       = $this->parseDecimal($m[1]);
+        }
+        if (preg_match('/(\d{5,8})\s*\nAssinatura eletr/u', $p2, $m)) {
+            $dados['proposta_nr'] = $m[1];
+        }
+
+        // Data de assinatura (ddmmaaaa na página de assinatura) — a vigência
+        // real fica em branco neste layout; a backoffice ajusta no formulário
+        foreach ([$assin, $p2] as $texto) {
+            if ($texto !== '' && preg_match_all('/\b(\d{2})(\d{2})(20\d{2})\b/', $texto, $mm, PREG_SET_ORDER)) {
+                foreach ($mm as $m) {
+                    if ((int)$m[1] >= 1 && (int)$m[1] <= 31 && (int)$m[2] >= 1 && (int)$m[2] <= 12) {
+                        $dados['data_vigencia'] = "{$m[3]}-{$m[2]}-{$m[1]}";
+                        $dados['data_boleto']   = $dados['data_vigencia'];
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        // Vendedor(a): na página de assinatura, primeiro nome em caixa alta
+        // que não seja a razão social nem o responsável
+        if ($assin !== '' && preg_match_all('/^([A-ZÁÉÍÓÚÃÕÂÊÎÇ][A-ZÁÉÍÓÚÃÕÂÊÎÇ ]{8,})$/mu', $assin, $mm)) {
+            foreach ($mm[1] as $nome) {
+                $nome = trim($nome);
+                if ($nome !== $dados['razao_social'] && $nome !== $dados['responsavel']) {
+                    $dados['nome_vendedor'] = $nome;
+                    break;
+                }
+            }
+        }
+
+        // Beneficiários: "CPF <tab> 251,56NOME COMPLETO 30/01/2004..."
+        if ($benef !== '' && preg_match_all(
+            '/(\d{3}\.\d{3}\.\d{3}-\d{2})\t([\d\.]+,\d{2})([A-ZÁÉÍÓÚÃÕÂÊÎÇ][A-ZÁÉÍÓÚÃÕÂÊÎÇ ]+?) (\d{2}\/\d{2}\/\d{4})/u',
+            $benef, $mm, PREG_SET_ORDER
+        )) {
+            foreach ($mm as $m) {
+                $dados['beneficiarios'][] = [
+                    'cpf'             => $m[1],
+                    'nome'            => trim($m[3]),
+                    'tipo'            => 'T',
+                    'data_nascimento' => $this->convertDate($m[4]),
+                    'valor'           => $this->parseDecimal($m[2]),
+                ];
+            }
+            if ($dados['vidas'] === 0) {
+                $dados['vidas'] = count($dados['beneficiarios']);
+            }
+        }
+
+        return $dados;
     }
 
     // ─── Format detection ─────────────────────────────────────
