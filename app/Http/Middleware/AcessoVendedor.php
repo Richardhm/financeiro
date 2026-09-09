@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 
 /**
  * Vendedores (cargo corretor) so acessam a area deles: Meus Clientes,
- * Programa Estrela e sair. Qualquer outra rota redireciona para Meus Clientes.
+ * Meu Perfil e sair. Qualquer outra rota redireciona para Meus Clientes.
  * Backoffice, diretores e demais cargos passam direto.
  */
 class AcessoVendedor
@@ -17,8 +17,9 @@ class AcessoVendedor
     private const ROTAS_PERMITIDAS = [
         'vendedor.clientes',
         'vendedor.clientes.parcelas',
-        'estrela.index',
         'logout',
+        'perfil.index',
+        'profile.alterar',
         'profile.edit',
         'profile.update',
         'password.update',
