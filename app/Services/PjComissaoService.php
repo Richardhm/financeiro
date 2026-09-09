@@ -122,8 +122,10 @@ class PjComissaoService
             }
             if (!$base || $base <= 0) continue;
 
-            // Zera todas as parcelas (1-6) antes de aplicar a faixa
-            $idsTodas = $parcelas->whereIn('parcela', [1, 2, 3, 4, 5, 6])->pluck('id');
+            // Zera as parcelas (1-6) antes de aplicar a faixa — PRESERVANDO as
+            // ja finalizadas (pagas ao corretor em folha): historico nao muda
+            $naoFinalizadas = $parcelas->filter(fn($p) => (int) ($p->finalizado ?? 0) !== 1);
+            $idsTodas = $naoFinalizadas->whereIn('parcela', [1, 2, 3, 4, 5, 6])->pluck('id');
             if ($idsTodas->isNotEmpty()) {
                 DB::table('comissoes_corretores_lancadas')->whereIn('id', $idsTodas)->update(['valor' => 0, 'porcentagem_paga' => null]);
             }
@@ -140,7 +142,7 @@ class PjComissaoService
             foreach ($campos as $n => $campo) {
                 $pct = (float) ($regra->$campo ?? 0);
                 if ($pct <= 0) continue;
-                $p = $parcelas->firstWhere('parcela', $n);
+                $p = $naoFinalizadas->firstWhere('parcela', $n);
                 if ($p) {
                     DB::table('comissoes_corretores_lancadas')
                         ->where('id', $p->id)
