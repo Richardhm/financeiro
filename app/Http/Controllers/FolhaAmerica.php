@@ -75,22 +75,36 @@ class FolhaAmerica extends Controller
             ->orderBy('vidas_min')
             ->get(['id', 'nome', 'vidas_min', 'vidas_max']);
 
-        // Vidas da COMPETENCIA aberta por vendedor CLT — mesma contagem do
-        // aplicarFaixaCltVendedor (contratos unicos com parcela pendente no mes),
+        // Vidas por vendedor CLT — mesma contagem do aplicarFaixaCltVendedor:
+        // VENDAS do mes da folha (individual/coletivo + vidas Super Simples),
         // para o rotulo "Regra X - N vidas" bater com o recalculo real
         $competenciaAberta = Carbon::parse($folhaMes->mes)->format('Y-m');
-        $vidasClt = DB::table('comissoes_corretores_lancadas as ccl')
-            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+        $vidasContratos = DB::table('comissoes as c')
+            ->join('contratos as ct', 'ct.id', '=', 'c.contrato_id')
             ->join('users as u', 'u.id', '=', 'c.user_id')
             ->where('u.corretora_id', $this->corretora_id)
             ->where('u.tipo_contrato', 'clt')
-            ->where('ccl.status_financeiro', 1)
-            ->where('ccl.competencia', $competenciaAberta)
-            ->where('ccl.finalizado', '!=', 1)
-            ->whereNull('ccl.data_baixa_gerente_folha')
+            ->whereIn('c.plano_id', [1, 3])
+            ->where('ct.financeiro_id', '!=', 12)
+            ->whereRaw("DATE_FORMAT(ct.created_at, '%Y-%m') = ?", [$competenciaAberta])
             ->groupBy('c.user_id')
-            ->selectRaw('c.user_id, COUNT(DISTINCT ccl.comissoes_id) as vidas')
+            ->selectRaw('c.user_id, COUNT(*) as vidas')
             ->pluck('vidas', 'user_id');
+        $vidasEmpresarial = DB::table('comissoes as c')
+            ->join('contrato_empresarial as ce', 'ce.id', '=', 'c.contrato_empresarial_id')
+            ->join('users as u', 'u.id', '=', 'c.user_id')
+            ->where('u.corretora_id', $this->corretora_id)
+            ->where('u.tipo_contrato', 'clt')
+            ->where('ce.financeiro_id', '!=', 12)
+            ->whereRaw("DATE_FORMAT(ce.created_at, '%Y-%m') = ?", [$competenciaAberta])
+            ->groupBy('c.user_id')
+            ->selectRaw('c.user_id, SUM(GREATEST(1, COALESCE(ce.quantidade_vidas, 1))) as vidas')
+            ->pluck('vidas', 'user_id');
+        $vidasClt = collect($vidasContratos)
+            ->map(fn($v, $uid) => (int) $v + (int) ($vidasEmpresarial[$uid] ?? 0));
+        foreach ($vidasEmpresarial as $uid => $v) {
+            if (!isset($vidasClt[$uid])) $vidasClt[$uid] = (int) $v;
+        }
 
         return view('folha.america.index', compact(
             'resumoGeral',
@@ -3669,7 +3683,16 @@ class FolhaAmerica extends Controller
 
     // ==================== CÃLCULO FAIXAS CLT ====================
 
-    private function aplicarFaixaCltVendedor(int $corretorId, string $competencia, bool $exigirGerente = true): ?array
+    /**
+     * Regra CLT (documento backoffice): a faixa e o bonus sao apurados pelas
+     * VENDAS DO MES (Individual + Coletivo por Adesao + Super Simples) e pela
+     * PRODUCAO VENDIDA (soma dos valores de plano). A comissao e paga UMA vez
+     * por venda — % da faixa sobre o valor do plano, lancada na 2a PARCELA
+     * (confirmacao da segunda mensalidade). Demais parcelas nao comissionam.
+     *
+     * @param string $mesVenda YYYY-MM do mes da VENDA (created_at do contrato)
+     */
+    private function aplicarFaixaCltVendedor(int $corretorId, string $mesVenda, bool $exigirGerente = true): ?array
     {
         $user = DB::table('users')->where('id', $corretorId)->select('tipo_contrato')->first();
 
@@ -3677,28 +3700,34 @@ class FolhaAmerica extends Controller
             return null;
         }
 
-        // ComissÃµes pendentes do vendedor nesta competÃªncia
-        $comissoes = DB::table('comissoes_corretores_lancadas as ccl')
-            ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
-            ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+        // Vendas do mes: contratos individuais/coletivos (via comissoes)
+        $contratos = DB::table('comissoes as c')
+            ->join('contratos as ct', 'ct.id', '=', 'c.contrato_id')
             ->where('c.user_id', $corretorId)
-            ->when($exigirGerente, fn($q) => $q->where('ccl.status_gerente', 1))
-            ->where('ccl.status_financeiro', 1)
-            ->where('ccl.competencia', $competencia)
-            ->where('ccl.finalizado', '!=', 1)
-            ->whereNull('ccl.data_baixa_gerente_folha')
-            ->select('ccl.id', 'ccl.comissoes_id', 'ccl.valor_pago', 'ct.valor_plano')
+            ->whereIn('c.plano_id', [1, 3])
+            ->where('ct.financeiro_id', '!=', 12)
+            ->whereRaw("DATE_FORMAT(ct.created_at, '%Y-%m') = ?", [$mesVenda])
+            ->select('c.id as comissao_id', 'ct.valor_plano')
             ->get();
 
-        if ($comissoes->isEmpty()) {
+        // Vendas Super Simples do mes (vidas contam pela quantidade)
+        $empresariais = DB::table('comissoes as c')
+            ->join('contrato_empresarial as ce', 'ce.id', '=', 'c.contrato_empresarial_id')
+            ->where('c.user_id', $corretorId)
+            ->where('ce.financeiro_id', '!=', 12)
+            ->whereRaw("DATE_FORMAT(ce.created_at, '%Y-%m') = ?", [$mesVenda])
+            ->select('c.id as comissao_id', 'ce.valor_plano', 'ce.quantidade_vidas')
+            ->get();
+
+        if ($contratos->isEmpty() && $empresariais->isEmpty()) {
             return null;
         }
 
-        // Vidas = contratos Ãºnicos com baixa nesta competÃªncia
-        $vidas = $comissoes->unique('comissoes_id')->count();
+        // Vidas do mes = contratos individuais/coletivos + vidas dos Super Simples
+        $vidas = $contratos->count() + (int) $empresariais->sum(fn($e) => max(1, (int) $e->quantidade_vidas));
 
-        // ProduÃ§Ã£o = soma do valor pago pelos clientes no mÃªs
-        $producao = $comissoes->whereNotNull('valor_pago')->sum('valor_pago');
+        // Producao = soma dos planos VENDIDOS no mes
+        $producao = (float) $contratos->sum('valor_plano') + (float) $empresariais->sum('valor_plano');
 
         // Encontrar a faixa pela quantidade de vidas
         $faixa = FaixaComissaoClt::where('corretora_id', $this->corretora_id)
@@ -3713,30 +3742,67 @@ class FolhaAmerica extends Controller
             return null;
         }
 
-        // Determinar o percentual: base ou bÃ´nus (se produÃ§Ã£o atingiu o limiar)
+        // Percentual: base ou bonus (se a producao vendida atingiu o limiar)
         $percentual = (float) $faixa->percentual;
         if ($faixa->producao_bonus !== null && $producao >= (float) $faixa->producao_bonus && $faixa->percentual_bonus !== null) {
             $percentual = (float) $faixa->percentual_bonus;
         }
 
-        // Recalcular valor de cada comissÃ£o com o percentual apurado
-        // Base = SEMPRE o valor_plano do contrato (mensalidade, sem taxa de adesÃ£o)
+        // Mes da folha aberta — parcelas zeradas de proposito em competencias
+        // ja encerradas (limpeza 2026-09-05) nao podem ser reativadas
+        $mesFolhaAberta = DB::table('folha_mes')
+            ->where('corretora_id', $this->corretora_id)
+            ->where('status', 0)
+            ->orderByDesc('mes')
+            ->value('mes');
+        $mesFolhaAberta = $mesFolhaAberta ? Carbon::parse($mesFolhaAberta)->format('Y-m') : null;
+
+        // Aplicar: zera as parcelas em aberto e lanca o % na 2a parcela
+        $porContrato = $contratos->map(fn($c) => (object) ['comissao_id' => $c->comissao_id, 'base' => (float) $c->valor_plano])
+            ->concat($empresariais->map(fn($e) => (object) ['comissao_id' => $e->comissao_id, 'base' => (float) $e->valor_plano]));
+
         $recalculadas = 0;
-        foreach ($comissoes as $ccl) {
-            $base = (float) ($ccl->valor_plano ?: (($ccl->valor_pago ?: 0) - 35));
-            if ($base <= 0) {
-                continue;
+        foreach ($porContrato as $item) {
+            if ($item->base <= 0) continue;
+
+            $parcelas = DB::table('comissoes_corretores_lancadas')
+                ->where('comissoes_id', $item->comissao_id)
+                ->get();
+            if ($parcelas->isEmpty()) continue;
+
+            // Comissao ja paga por este contrato numa folha anterior (regra
+            // antiga pagava em varias parcelas)? Entao nao lancar de novo.
+            $jaRecebeu = $parcelas->contains(
+                fn($p) => (int) ($p->finalizado ?? 0) === 1 && (float) $p->valor > 0
+            );
+
+            $aplicaveis = $parcelas->filter(function ($p) use ($mesFolhaAberta) {
+                if ((int) ($p->finalizado ?? 0) === 1) return false;
+                if ($mesFolhaAberta
+                    && (int) ($p->status_financeiro ?? 0) === 1
+                    && (float) $p->valor == 0.0
+                    && !empty($p->competencia)
+                    && $p->competencia < $mesFolhaAberta) return false;
+                return true;
+            });
+
+            $ids = $aplicaveis->pluck('id');
+            if ($ids->isNotEmpty()) {
+                DB::table('comissoes_corretores_lancadas')->whereIn('id', $ids)->update(['valor' => 0, 'porcentagem_paga' => null]);
             }
 
-            $novoValor = max(0, $base * $percentual / 100);
-
-            DB::table('comissoes_corretores_lancadas')
-                ->where('id', $ccl->id)
-                ->update([
-                    'valor'            => $novoValor,
-                    'porcentagem_paga' => $percentual,
-                ]);
-            $recalculadas++;
+            if (!$jaRecebeu) {
+                $p2 = $aplicaveis->firstWhere('parcela', 2);
+                if ($p2) {
+                    DB::table('comissoes_corretores_lancadas')
+                        ->where('id', $p2->id)
+                        ->update([
+                            'valor'            => round($item->base * $percentual / 100, 2),
+                            'porcentagem_paga' => $percentual,
+                        ]);
+                    $recalculadas++;
+                }
+            }
         }
 
         return [
