@@ -253,17 +253,6 @@
                         {{-- Painel CLT (oculto por default) --}}
                         <div id="painel-clt" class="hidden">
                             @forelse($vendedoresClt as $corretor)
-                                @php
-                                    // Vidas da competencia aberta (mesma contagem do recalculo),
-                                    // NAO o total da carteira
-                                    $vidas = (int) (($vidasClt[$corretor->id] ?? null) ?? 0);
-                                    $regraClt = isset($faixasClt)
-                                        ? $faixasClt->first(fn($f) =>
-                                            $vidas >= $f->vidas_min &&
-                                            ($f->vidas_max === null || $vidas <= $f->vidas_max)
-                                          )
-                                        : null;
-                                @endphp
                                 <div class="group cursor-pointer border-b border-white/10 p-1 transition-colors corretor-item"
                                      data-corretor-id="{{ $corretor->id }}"
                                      data-nome="{{ strtolower($corretor->name) }}">
@@ -284,13 +273,6 @@
                                                 <p class="font-medium text-white flex mr-5">
                                                     <span class="ml-2">{{ implode(' ', array_slice(explode(' ', $corretor->name), 0, 3)) }}</span>
                                                 </p>
-                                                @if($regraClt)
-                                                    @php $mesAbrev = isset($mesAtual) ? ucfirst(mb_substr($mesAtual, 0, 3)) : ''; @endphp
-                                                    <span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-green-900/60 text-green-300 font-semibold tracking-wide"
-                                                          title="Vendas do mês da folha ({{ $mesAtual ?? '' }}) — define a faixa das vendas deste mês. Cada parcela listada usa a faixa do mês da própria venda.">
-                                                        Vendas {{ $mesAbrev }}: {{ $vidas }} · {{ $regraClt->nome }}
-                                                    </span>
-                                                @endif
                                             </div>
                                         </div>
                                         <div>
