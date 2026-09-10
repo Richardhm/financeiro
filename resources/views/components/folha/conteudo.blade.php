@@ -285,8 +285,10 @@
                                                     <span class="ml-2">{{ implode(' ', array_slice(explode(' ', $corretor->name), 0, 3)) }}</span>
                                                 </p>
                                                 @if($regraClt)
-                                                    <span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-green-900/60 text-green-300 font-semibold tracking-wide">
-                                                        {{ $regraClt->nome }} · {{ $vidas }} vida(s)
+                                                    @php $mesAbrev = isset($mesAtual) ? ucfirst(mb_substr($mesAtual, 0, 3)) : ''; @endphp
+                                                    <span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-green-900/60 text-green-300 font-semibold tracking-wide"
+                                                          title="Vendas do mês da folha ({{ $mesAtual ?? '' }}) — define a faixa das vendas deste mês. Cada parcela listada usa a faixa do mês da própria venda.">
+                                                        Vendas {{ $mesAbrev }}: {{ $vidas }} · {{ $regraClt->nome }}
                                                     </span>
                                                 @endif
                                             </div>
