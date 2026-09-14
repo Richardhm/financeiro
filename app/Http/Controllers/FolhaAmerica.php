@@ -200,7 +200,7 @@ class FolhaAmerica extends Controller
                     DB::raw("CASE WHEN c.contrato_id IS NOT NULL AND c.plano_id = 1 THEN 'individual' WHEN c.contrato_id IS NOT NULL AND c.plano_id = 3 THEN 'coletivo' WHEN c.contrato_empresarial_id IS NOT NULL THEN 'empresarial' ELSE 'outro' END AS tipo_contrato"),
                     DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN cl.quantidade_vidas WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.quantidade_vidas ELSE cl.quantidade_vidas END as quantidade_vidas'),
                     'ccl.valor as valor_comissao',
-                    DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano ELSE ccl.valor END as valor_plano'),
+                    DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano - ((ct.valor_plano * COALESCE(cl.desconto_operadora, 0)) / 100) WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano - ((ce.valor_plano * COALESCE(ce.desconto_operadora, 0)) / 100) ELSE ccl.valor END as valor_plano'),
                     DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                     'ccl.parcela as parcela',
                     'ccl.data_baixa_gerente as data_vencimento'
@@ -857,12 +857,12 @@ class FolhaAmerica extends Controller
                     'ct.codigo_externo as contrato_codigo',
                     'ct.valor_plano as valor_original_plano',
                     DB::raw("
-                        (CASE
+                        CASE
                             WHEN cl.desconto_operadora IS NOT NULL THEN
                                 ct.valor_plano - ((ct.valor_plano * cl.desconto_operadora) / 100)
                             ELSE
                                 ct.valor_plano
-                        END) - COALESCE(ct.desconto_corretor, 0) as valor_plano_ajustado
+                        END as valor_plano_ajustado
                     "),
                     //'ct.valor_plano as valor_plano',
                     'ct.created_at as data_cadastro',
@@ -1112,12 +1112,12 @@ class FolhaAmerica extends Controller
                     'ccl.data AS vencimento',
                     'ce.valor_plano as valor_original_plano',
                     DB::raw("
-                        (CASE
+                        CASE
                             WHEN ce.desconto_operadora IS NOT NULL THEN
                                 ce.valor_plano - ((ce.valor_plano * ce.desconto_operadora) / 100)
                             ELSE
                                 ce.valor_plano
-                        END) - COALESCE(ce.desconto_corretor, 0) as valor_plano_ajustado
+                        END as valor_plano_ajustado
                     "),
                     DB::raw("COALESCE(ccl.porcentagem_paga, ROUND(ccl.valor / NULLIF(ce.valor_plano, 0) * 100, 0)) as porcentagem")
                 );
@@ -1294,19 +1294,28 @@ class FolhaAmerica extends Controller
             $valorPlano = str_replace(['.', ','],['', '.'], $request->valor);
             $valorPlano = (float) $valorPlano;
 
+            // Desconto do vendedor no contrato desta parcela (contrato ou empresarial)
+            $descontoContrato = (float) (DB::table('comissoes_corretores_lancadas as ccl')
+                ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+                ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+                ->leftJoin('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
+                ->where('ccl.id', $request->id)
+                ->selectRaw('COALESCE(ct.desconto_corretor, 0) + COALESCE(ce.desconto_corretor, 0) as d')
+                ->value('d') ?? 0);
 
-            // Calcular o novo valor da comissÃ£o
-            $novoValorComissao = ($valorPlano * $request->porcentagem) / 100;
+            // O % e aplicado sobre a base JA SEM o desconto do vendedor (conta da
+            // backoffice); a parcela grava o BRUTO (liquido + desconto) e o desconto
+            // separado, para o PDF mostrar o desconto e abater no total.
+            $liquido = round(max(0, $valorPlano - $descontoContrato) * $request->porcentagem / 100, 2);
+            $novoValorComissao = $liquido > 0 ? $liquido + $descontoContrato : $liquido;
+            $descontoParcela   = $liquido > 0 ? $descontoContrato : 0;
 
-            // Atualizar o banco de dados
-            // Lancamento manual: o valor calculado e o LIQUIDO final a pagar.
-            // Zera o desconto da parcela para a folha nao descontar de novo.
             DB::table('comissoes_corretores_lancadas')
                 ->where('id', $request->id)
                 ->update([
                     'porcentagem_paga' => $request->porcentagem,
                     'valor' => $novoValorComissao,
-                    'desconto' => 0,
+                    'desconto' => $descontoParcela,
                     'updated_at' => now(),
                 ]);
 
@@ -2075,8 +2084,8 @@ class FolhaAmerica extends Controller
 
                             'ccl.valor as valor_comissao',
                             DB::raw('CASE
-                                WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano
-                                WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano
+                                WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano - ((ct.valor_plano * COALESCE(cl.desconto_operadora, 0)) / 100)
+                                WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano - ((ce.valor_plano * COALESCE(ce.desconto_operadora, 0)) / 100)
                                 ELSE ccl.valor END as valor_plano'),
                             DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                             'ccl.parcela as parcela',
@@ -2308,8 +2317,8 @@ class FolhaAmerica extends Controller
 
                             'ccl.valor as valor_comissao',
                             DB::raw('CASE
-                                WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano
-                                WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano
+                                WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano - ((ct.valor_plano * COALESCE(cl.desconto_operadora, 0)) / 100)
+                                WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano - ((ce.valor_plano * COALESCE(ce.desconto_operadora, 0)) / 100)
                                 ELSE ccl.valor END as valor_plano'),
                             DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                             'ccl.parcela as parcela',
@@ -2773,7 +2782,7 @@ class FolhaAmerica extends Controller
                         DB::raw("CASE WHEN c.contrato_id IS NOT NULL AND c.plano_id = 1 THEN 'individual' WHEN c.contrato_id IS NOT NULL AND c.plano_id = 3 THEN 'coletivo' WHEN c.contrato_empresarial_id IS NOT NULL THEN 'empresarial' ELSE 'outro' END AS tipo_contrato"),
                         DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN cl.quantidade_vidas WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.quantidade_vidas ELSE cl.quantidade_vidas END as quantidade_vidas'),
                         'ccl.valor as valor_comissao',
-                        DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano ELSE ccl.valor END as valor_plano'),
+                        DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano - ((ct.valor_plano * COALESCE(cl.desconto_operadora, 0)) / 100) WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano - ((ce.valor_plano * COALESCE(ce.desconto_operadora, 0)) / 100) ELSE ccl.valor END as valor_plano'),
                         DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                         'ccl.parcela as parcela',
                         'ccl.data_baixa_gerente as data_vencimento'

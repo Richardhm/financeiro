@@ -42,8 +42,11 @@ SET ccl.desconto = COALESCE(ct.desconto_corretor, 0) + COALESCE(ce.desconto_corr
 WHERE ccl.finalizado != 1 AND ccl.valor != 0 AND f.comissoes_id IS NULL;
 
 -- 3. Coletivos lancados manualmente pela backoffice com valor JA LIQUIDO
---    (Giselly: Angela Cunha, Leia Tereza, Leysa Alves): sem desconto extra
-UPDATE comissoes_corretores_lancadas SET desconto = 0 WHERE id IN (90150, 90143, 90129);
+--    (Giselly: Angela Cunha, Leia Tereza, Leysa Alves): converter para
+--    BRUTO (liquido + desconto) com o desconto visivel na parcela.
+--    Liquido a pagar continua 178,26 / 178,26 / 73,50.
+UPDATE comissoes_corretores_lancadas SET valor = 254.66, desconto = 76.40 WHERE id IN (90150, 90143) AND valor = 178.26;
+UPDATE comissoes_corretores_lancadas SET valor = 105.01, desconto = 31.51 WHERE id = 90129 AND valor = 73.50;
 
 -- 4. Contrato da Leysa Alves Soares com ano digitado errado (2006 -> 2026)
 UPDATE contratos SET created_at = '2026-08-19 21:00:00' WHERE id = 13715 AND created_at LIKE '2006-08-19%';

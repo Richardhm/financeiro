@@ -3024,6 +3024,11 @@ class FinanceiroController extends Controller
         $comissao->corretora_id = $corretora_id;
         $comissao->save();
 
+        // Desconto do vendedor: gravado UMA vez, na primeira parcela com valor.
+        // A parcela guarda o BRUTO (liquido + desconto) e o desconto separado,
+        // para o PDF mostrar o desconto e abater no total.
+        $descontoColPendente = $desconto_corretor_float;
+
         if ($user->first()->clt == 1) {
 
             $dados = ComissoesCorretoresDefault
@@ -3061,6 +3066,11 @@ class FinanceiroController extends Controller
                     //}
                 } else {
                     $valorComDesconto = max(0, $valor - $desconto_corretor_float) * $c->valor / 100;
+                }
+                if ($valorComDesconto > 0 && $descontoColPendente > 0) {
+                    $valorComDesconto += $descontoColPendente;
+                    $comissaoVendedor->desconto = $descontoColPendente;
+                    $descontoColPendente = 0;
                 }
                 $comissaoVendedor->valor = $valorComDesconto;
                 $comissaoVendedor->save();
@@ -3114,6 +3124,11 @@ class FinanceiroController extends Controller
                     } else {
                         $valorComDesconto = max(0, $valor - $desconto_corretor_float) * $c->valor / 100;
                     }
+                    if ($valorComDesconto > 0 && $descontoColPendente > 0) {
+                        $valorComDesconto += $descontoColPendente;
+                        $comissaoVendedor->desconto = $descontoColPendente;
+                        $descontoColPendente = 0;
+                    }
                     $comissaoVendedor->valor = $valorComDesconto;
                     $comissaoVendedor->save();
                     $comissao_corretor_contagem++;
@@ -3152,6 +3167,11 @@ class FinanceiroController extends Controller
                         //}
                     } else {
                         $valorComDesconto = max(0, $valor - $desconto_corretor_float) * $c->valor / 100;
+                    }
+                    if ($valorComDesconto > 0 && $descontoColPendente > 0) {
+                        $valorComDesconto += $descontoColPendente;
+                        $comissaoVendedor->desconto = $descontoColPendente;
+                        $descontoColPendente = 0;
                     }
                     $comissaoVendedor->valor = $valorComDesconto;
                     $comissaoVendedor->save();
@@ -3735,10 +3755,22 @@ class FinanceiroController extends Controller
     {
         $parcela = ComissoesCorretoresLancadas::findOrFail($request->id);
         $valor   = (float) str_replace(['.', ','], ['', '.'], $request->valor ?? '0');
-        $parcela->valor = $valor;
-        // Lancamento manual: o valor digitado e o LIQUIDO final a pagar.
-        // Zera o desconto da parcela para a folha nao descontar de novo.
-        $parcela->desconto = 0;
+
+        // O valor digitado e o LIQUIDO final a pagar. A parcela grava o BRUTO
+        // (liquido + desconto do vendedor) e o desconto separado, para a folha
+        // mostrar o desconto e abater no total — sem nunca descontar em dobro.
+        $comissao = Comissoes::find($parcela->comissoes_id);
+        $descontoContrato = 0.0;
+        if ($comissao) {
+            if ($comissao->contrato_id) {
+                $descontoContrato = (float) (Contrato::where('id', $comissao->contrato_id)->value('desconto_corretor') ?? 0);
+            } elseif ($comissao->contrato_empresarial_id) {
+                $descontoContrato = (float) (ContratoEmpresarial::where('id', $comissao->contrato_empresarial_id)->value('desconto_corretor') ?? 0);
+            }
+        }
+
+        $parcela->valor    = $valor > 0 ? $valor + $descontoContrato : $valor;
+        $parcela->desconto = $valor > 0 ? $descontoContrato : 0;
         $parcela->save();
         return response()->json(['success' => true, 'valor' => number_format($valor, 2, ',', '.')]);
     }
@@ -4517,10 +4549,13 @@ class FinanceiroController extends Controller
             ->firstOrFail();
 
         $valor = (float) str_replace(['.', ','], ['', '.'], $request->valor);
-        $lancada->valor = $valor;
-        // Lancamento manual: o valor digitado e o LIQUIDO final a pagar.
-        // Zera o desconto da parcela para a folha nao descontar de novo.
-        $lancada->desconto = 0;
+
+        // O valor digitado e o LIQUIDO final a pagar. A parcela grava o BRUTO
+        // (liquido + desconto do vendedor) e o desconto separado, para a folha
+        // mostrar o desconto e abater no total — sem nunca descontar em dobro.
+        $descontoContrato = (float) ($contrato->desconto_corretor ?? 0);
+        $lancada->valor    = $valor > 0 ? $valor + $descontoContrato : $valor;
+        $lancada->desconto = $valor > 0 ? $descontoContrato : 0;
         $lancada->save();
 
         return response()->json(['success' => true, 'valor' => number_format($valor, 2, ',', '.')]);
