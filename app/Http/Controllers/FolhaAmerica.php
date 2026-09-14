@@ -201,7 +201,7 @@ class FolhaAmerica extends Controller
                     DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN cl.quantidade_vidas WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.quantidade_vidas ELSE cl.quantidade_vidas END as quantidade_vidas'),
                     'ccl.valor as valor_comissao',
                     DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano ELSE ccl.valor END as valor_plano'),
-                    DB::raw('COALESCE(ct.desconto_corretor, 0) + COALESCE(ce.desconto_corretor, 0) as desconto_corretor'),
+                    DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                     'ccl.parcela as parcela',
                     'ccl.data_baixa_gerente as data_vencimento'
                 )
@@ -848,7 +848,7 @@ class FolhaAmerica extends Controller
                     'cl.cpf',
                     'ccl.manualmente',
                     'ct.plano_id as plano',
-                    'ct.desconto_corretor',
+                    DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                     'ct.valor_plano as valor_plano',
                     'ccl.valor as valor_comissao',
                     'ccl.incluir',
@@ -857,12 +857,12 @@ class FolhaAmerica extends Controller
                     'ct.codigo_externo as contrato_codigo',
                     'ct.valor_plano as valor_original_plano',
                     DB::raw("
-                        CASE
+                        (CASE
                             WHEN cl.desconto_operadora IS NOT NULL THEN
                                 ct.valor_plano - ((ct.valor_plano * cl.desconto_operadora) / 100)
                             ELSE
                                 ct.valor_plano
-                        END as valor_plano_ajustado
+                        END) - COALESCE(ct.desconto_corretor, 0) as valor_plano_ajustado
                     "),
                     //'ct.valor_plano as valor_plano',
                     'ct.created_at as data_cadastro',
@@ -1098,7 +1098,7 @@ class FolhaAmerica extends Controller
                 ->select(
                     'ce.razao_social as cliente_nome',  // Usando razao_social em vez de nome do cliente
                     'ce.cnpj as cpf',                   // Usando CNPJ em vez de CPF
-                    'ce.desconto_corretor',
+                    DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                     'ccl.valor as valor_comissao',
                     'ccl.id',
                     'ccl.folha',
@@ -1112,12 +1112,12 @@ class FolhaAmerica extends Controller
                     'ccl.data AS vencimento',
                     'ce.valor_plano as valor_original_plano',
                     DB::raw("
-                        CASE
+                        (CASE
                             WHEN ce.desconto_operadora IS NOT NULL THEN
                                 ce.valor_plano - ((ce.valor_plano * ce.desconto_operadora) / 100)
                             ELSE
                                 ce.valor_plano
-                        END as valor_plano_ajustado
+                        END) - COALESCE(ce.desconto_corretor, 0) as valor_plano_ajustado
                     "),
                     DB::raw("COALESCE(ccl.porcentagem_paga, ROUND(ccl.valor / NULLIF(ce.valor_plano, 0) * 100, 0)) as porcentagem")
                 );
@@ -1299,11 +1299,14 @@ class FolhaAmerica extends Controller
             $novoValorComissao = ($valorPlano * $request->porcentagem) / 100;
 
             // Atualizar o banco de dados
+            // Lancamento manual: o valor calculado e o LIQUIDO final a pagar.
+            // Zera o desconto da parcela para a folha nao descontar de novo.
             DB::table('comissoes_corretores_lancadas')
                 ->where('id', $request->id)
                 ->update([
                     'porcentagem_paga' => $request->porcentagem,
                     'valor' => $novoValorComissao,
+                    'desconto' => 0,
                     'updated_at' => now(),
                 ]);
 
@@ -2075,7 +2078,7 @@ class FolhaAmerica extends Controller
                                 WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano
                                 WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano
                                 ELSE ccl.valor END as valor_plano'),
-                            DB::raw('COALESCE(ct.desconto_corretor, 0) + COALESCE(ce.desconto_corretor, 0) as desconto_corretor'),
+                            DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                             'ccl.parcela as parcela',
                             'ccl.data_baixa_gerente as data_vencimento'
                         )
@@ -2308,7 +2311,7 @@ class FolhaAmerica extends Controller
                                 WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano
                                 WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano
                                 ELSE ccl.valor END as valor_plano'),
-                            DB::raw('COALESCE(ct.desconto_corretor, 0) + COALESCE(ce.desconto_corretor, 0) as desconto_corretor'),
+                            DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                             'ccl.parcela as parcela',
                             'ccl.data_baixa_gerente as data_vencimento'
                         )
@@ -2663,7 +2666,7 @@ class FolhaAmerica extends Controller
                     u.tipo_contrato,
                     COUNT(ccl.id)   AS total_parcelas,
                     SUM(ccl.valor)  AS total_comissao,
-                    SUM(COALESCE(ct.desconto_corretor, cte.desconto_corretor, 0)) AS total_desconto
+                    SUM(COALESCE(ccl.desconto, 0)) AS total_desconto
                 ')
                 ->groupBy('u.id', 'u.name', 'u.tipo_contrato')
                 ->orderBy('u.name')
@@ -2771,7 +2774,7 @@ class FolhaAmerica extends Controller
                         DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN cl.quantidade_vidas WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.quantidade_vidas ELSE cl.quantidade_vidas END as quantidade_vidas'),
                         'ccl.valor as valor_comissao',
                         DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano ELSE ccl.valor END as valor_plano'),
-                        DB::raw('COALESCE(ct.desconto_corretor, 0) + COALESCE(ce.desconto_corretor, 0) as desconto_corretor'),
+                        DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                         'ccl.parcela as parcela',
                         'ccl.data_baixa_gerente as data_vencimento'
                     )
@@ -3217,17 +3220,7 @@ class FolhaAmerica extends Controller
                             AND ccl.finalizado != 1
                             AND ccl.folha = 1
                             AND ccl.valor != 0
-                            THEN ct.desconto_corretor
-                            ELSE 0
-                        END
-                    ), 0)
-                    - COALESCE(SUM(
-                        CASE
-                            WHEN ccl.status_financeiro = 1
-                            AND ccl.finalizado != 1
-                            AND ccl.folha = 1
-                            AND ccl.valor != 0
-                            THEN cte.desconto_corretor
+                            THEN COALESCE(ccl.desconto, 0)
                             ELSE 0
                         END
                     ), 0)
@@ -3707,7 +3700,7 @@ class FolhaAmerica extends Controller
             ->whereIn('c.plano_id', [1, 3])
             ->where('ct.financeiro_id', '!=', 12)
             ->whereRaw("DATE_FORMAT(ct.created_at, '%Y-%m') = ?", [$mesVenda])
-            ->select('c.id as comissao_id', 'ct.valor_plano')
+            ->select('c.id as comissao_id', 'ct.valor_plano', 'ct.desconto_corretor')
             ->get();
 
         // Vendas Super Simples do mes (vidas contam pela quantidade)
@@ -3716,7 +3709,7 @@ class FolhaAmerica extends Controller
             ->where('c.user_id', $corretorId)
             ->where('ce.financeiro_id', '!=', 12)
             ->whereRaw("DATE_FORMAT(ce.created_at, '%Y-%m') = ?", [$mesVenda])
-            ->select('c.id as comissao_id', 'ce.valor_plano', 'ce.quantidade_vidas')
+            ->select('c.id as comissao_id', 'ce.valor_plano', 'ce.quantidade_vidas', 'ce.desconto_corretor')
             ->get();
 
         if ($contratos->isEmpty() && $empresariais->isEmpty()) {
@@ -3758,8 +3751,8 @@ class FolhaAmerica extends Controller
         $mesFolhaAberta = $mesFolhaAberta ? Carbon::parse($mesFolhaAberta)->format('Y-m') : null;
 
         // Aplicar: zera as parcelas em aberto e lanca o % na 2a parcela
-        $porContrato = $contratos->map(fn($c) => (object) ['comissao_id' => $c->comissao_id, 'base' => (float) $c->valor_plano])
-            ->concat($empresariais->map(fn($e) => (object) ['comissao_id' => $e->comissao_id, 'base' => (float) $e->valor_plano]));
+        $porContrato = $contratos->map(fn($c) => (object) ['comissao_id' => $c->comissao_id, 'base' => (float) $c->valor_plano, 'desconto' => (float) ($c->desconto_corretor ?? 0)])
+            ->concat($empresariais->map(fn($e) => (object) ['comissao_id' => $e->comissao_id, 'base' => (float) $e->valor_plano, 'desconto' => (float) ($e->desconto_corretor ?? 0)]));
 
         $recalculadas = 0;
         foreach ($porContrato as $item) {
@@ -3788,17 +3781,23 @@ class FolhaAmerica extends Controller
 
             $ids = $aplicaveis->pluck('id');
             if ($ids->isNotEmpty()) {
-                DB::table('comissoes_corretores_lancadas')->whereIn('id', $ids)->update(['valor' => 0, 'porcentagem_paga' => null]);
+                DB::table('comissoes_corretores_lancadas')->whereIn('id', $ids)->update(['valor' => 0, 'porcentagem_paga' => null, 'desconto' => 0]);
             }
 
             if (!$jaRecebeu) {
                 $p2 = $aplicaveis->firstWhere('parcela', 2);
                 if ($p2) {
+                    // Desconto do vendedor cobrado UMA vez, junto da parcela que paga
+                    // (se parcela finalizada ja o carregou, nao cobra de novo)
+                    $jaCobrouDesconto = $parcelas->contains(
+                        fn($p) => (int) ($p->finalizado ?? 0) === 1 && (float) ($p->desconto ?? 0) > 0
+                    );
                     DB::table('comissoes_corretores_lancadas')
                         ->where('id', $p2->id)
                         ->update([
                             'valor'            => round($item->base * $percentual / 100, 2),
                             'porcentagem_paga' => $percentual,
+                            'desconto'         => $jaCobrouDesconto ? 0 : $item->desconto,
                         ]);
                     $recalculadas++;
                 }
@@ -4967,7 +4966,7 @@ class FolhaAmerica extends Controller
             ->where('ccl.status_gerente', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->whereNull('ccl.data_baixa_gerente_folha')
-            ->select('ccl.id', 'ccl.parcela', 'ccl.valor_pago', 'ccl.comissoes_id', 'c.plano_id', 'ct.valor_plano')
+            ->select('ccl.id', 'ccl.parcela', 'ccl.valor_pago', 'ccl.comissoes_id', 'c.plano_id', 'ct.valor_plano', 'ct.desconto_corretor')
             ->get();
 
         if ($comissoes->isEmpty()) return;
@@ -4990,7 +4989,7 @@ class FolhaAmerica extends Controller
 
             DB::table('comissoes_corretores_lancadas')
                 ->whereIn('id', $parcelas->pluck('id'))
-                ->update(['valor' => 0, 'porcentagem_paga' => null]);
+                ->update(['valor' => 0, 'porcentagem_paga' => null, 'desconto' => 0]);
 
             if ($baseCalc <= 0) continue;
 
@@ -5002,6 +5001,8 @@ class FolhaAmerica extends Controller
                 5 => $regra->parcela_5_pct,
                 6 => $regra->parcela_6_pct,
             ];
+            // Desconto do vendedor cobrado UMA vez: na primeira parcela com valor
+            $descontoPendente = (float) ($parcelas->first()->desconto_corretor ?? 0);
             foreach ($percentuais as $num => $pct) {
                 if ((float) $pct <= 0) continue;
                 $p = $parcelas->firstWhere('parcela', $num);
@@ -5011,7 +5012,9 @@ class FolhaAmerica extends Controller
                         ->update([
                             'valor'            => round($baseCalc * (float) $pct / 100, 2),
                             'porcentagem_paga' => (float) $pct,
+                            'desconto'         => $descontoPendente,
                         ]);
+                    $descontoPendente = 0;
                 }
             }
         }

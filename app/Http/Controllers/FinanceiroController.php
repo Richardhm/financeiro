@@ -823,6 +823,9 @@ class FinanceiroController extends Controller
         $comissao_corretor_contagem = 0;
         $valorComDesconto = 0;
         $comissao_corretor_default = 0;
+        // Desconto do vendedor: gravado UMA vez, na primeira parcela com valor
+        // (campo ccl.desconto — a folha subtrai somente ccl.desconto)
+        $descontoEmpPendente = (float) $dados['desconto_corretor'];
 
         if ($tipo_contrato === 'parceiro') {
             $regraParceiro = ParceirosRegraComissao::where('corretora_id', $corretora_id)
@@ -860,6 +863,10 @@ class FinanceiroController extends Controller
                         $valorComDesconto *= (1 - 0.0665);
                     }
                     $comissaoVendedor->valor = $valorComDesconto;
+                    if ($valorComDesconto > 0 && $descontoEmpPendente > 0) {
+                        $comissaoVendedor->desconto = $descontoEmpPendente;
+                        $descontoEmpPendente = 0;
+                    }
                     $comissaoVendedor->save();
                     $comissao_corretor_contagem++;
                 }
@@ -896,6 +903,10 @@ class FinanceiroController extends Controller
                     $valorComDesconto *= (1 - 0.0665);
                 }
                 $comissaoVendedor->valor = $valorComDesconto;
+                if ($valorComDesconto > 0 && $descontoEmpPendente > 0) {
+                    $comissaoVendedor->desconto = $descontoEmpPendente;
+                    $descontoEmpPendente = 0;
+                }
                 $comissaoVendedor->save();
                 $comissao_corretor_default++;
             }
@@ -932,6 +943,10 @@ class FinanceiroController extends Controller
                         $valorComDesconto *= (1 - 0.0665);
                     }
                     $comissaoVendedor->valor = $valorComDesconto;
+                    if ($valorComDesconto > 0 && $descontoEmpPendente > 0) {
+                        $comissaoVendedor->desconto = $descontoEmpPendente;
+                        $descontoEmpPendente = 0;
+                    }
                     $comissaoVendedor->save();
                     $comissao_corretor_contagem++;
                 }
@@ -969,6 +984,10 @@ class FinanceiroController extends Controller
                         $valorComDesconto *= (1 - 0.0665);
                     }
                     $comissaoVendedor->valor = $valorComDesconto;
+                    if ($valorComDesconto > 0 && $descontoEmpPendente > 0) {
+                        $comissaoVendedor->desconto = $descontoEmpPendente;
+                        $descontoEmpPendente = 0;
+                    }
                     $comissaoVendedor->save();
                     $comissao_corretor_contagem++;
                 }
@@ -2915,6 +2934,8 @@ class FinanceiroController extends Controller
         }
         $desconto_corretor = $request->desconto_corretor ?? 0;
         $desconto_corretora = $request->desconto_corretora ?? 0;
+        // Desconto do vendedor como float (aceita "76,40" ou "76.40")
+        $desconto_corretor_float = (float) str_replace(',', '.', (string) $desconto_corretor);
         $valor = str_replace([".",","],["","."],$request->valor);
         $cliente = new Cliente();
         $cliente->nome = $request->nome_coletivo;
@@ -3034,10 +3055,12 @@ class FinanceiroController extends Controller
                 }
                 if($request->quantidade_parcelas >= 1 && $request->desconto_operadora >= 0 && $cd <= $request->quantidade_parcelas) {
                     //if($comissao_corretor_contagem <= $request->quantidade_parcelas) {
-                    $valorComDesconto = ($valor * (1 - $request->desconto_operadora / 100)) * $c->valor / 100;
+                    // Base liquida: desconta operadora E desconto do vendedor antes do %
+                    // (mesma conta da backoffice; o valor gravado ja e o final a pagar)
+                    $valorComDesconto = max(0, ($valor * (1 - $request->desconto_operadora / 100)) - $desconto_corretor_float) * $c->valor / 100;
                     //}
                 } else {
-                    $valorComDesconto = ($valor * $c->valor) / 100;
+                    $valorComDesconto = max(0, $valor - $desconto_corretor_float) * $c->valor / 100;
                 }
                 $comissaoVendedor->valor = $valorComDesconto;
                 $comissaoVendedor->save();
@@ -3084,10 +3107,12 @@ class FinanceiroController extends Controller
                     }
                     if($request->quantidade_parcelas >= 1 && $request->desconto_operadora >= 0 && $cd <= $request->quantidade_parcelas) {
                         //if($comissao_corretor_contagem <= $request->quantidade_parcelas) {
-                        $valorComDesconto = ($valor * (1 - $request->desconto_operadora / 100)) * $c->valor / 100;
+                        // Base liquida: desconta operadora E desconto do vendedor antes do %
+                        // (mesma conta da backoffice; o valor gravado ja e o final a pagar)
+                        $valorComDesconto = max(0, ($valor * (1 - $request->desconto_operadora / 100)) - $desconto_corretor_float) * $c->valor / 100;
                         //}
                     } else {
-                        $valorComDesconto = ($valor * $c->valor) / 100;
+                        $valorComDesconto = max(0, $valor - $desconto_corretor_float) * $c->valor / 100;
                     }
                     $comissaoVendedor->valor = $valorComDesconto;
                     $comissaoVendedor->save();
@@ -3121,10 +3146,12 @@ class FinanceiroController extends Controller
                     }
                     if($request->quantidade_parcelas >= 1 && $request->desconto_operadora >= 0 && $cd <= $request->quantidade_parcelas) {
                         //if($comissao_corretor_contagem <= $request->quantidade_parcelas) {
-                        $valorComDesconto = ($valor * (1 - $request->desconto_operadora / 100)) * $c->valor / 100;
+                        // Base liquida: desconta operadora E desconto do vendedor antes do %
+                        // (mesma conta da backoffice; o valor gravado ja e o final a pagar)
+                        $valorComDesconto = max(0, ($valor * (1 - $request->desconto_operadora / 100)) - $desconto_corretor_float) * $c->valor / 100;
                         //}
                     } else {
-                        $valorComDesconto = ($valor * $c->valor) / 100;
+                        $valorComDesconto = max(0, $valor - $desconto_corretor_float) * $c->valor / 100;
                     }
                     $comissaoVendedor->valor = $valorComDesconto;
                     $comissaoVendedor->save();
@@ -3709,6 +3736,9 @@ class FinanceiroController extends Controller
         $parcela = ComissoesCorretoresLancadas::findOrFail($request->id);
         $valor   = (float) str_replace(['.', ','], ['', '.'], $request->valor ?? '0');
         $parcela->valor = $valor;
+        // Lancamento manual: o valor digitado e o LIQUIDO final a pagar.
+        // Zera o desconto da parcela para a folha nao descontar de novo.
+        $parcela->desconto = 0;
         $parcela->save();
         return response()->json(['success' => true, 'valor' => number_format($valor, 2, ',', '.')]);
     }
@@ -4488,6 +4518,9 @@ class FinanceiroController extends Controller
 
         $valor = (float) str_replace(['.', ','], ['', '.'], $request->valor);
         $lancada->valor = $valor;
+        // Lancamento manual: o valor digitado e o LIQUIDO final a pagar.
+        // Zera o desconto da parcela para a folha nao descontar de novo.
+        $lancada->desconto = 0;
         $lancada->save();
 
         return response()->json(['success' => true, 'valor' => number_format($valor, 2, ',', '.')]);
@@ -4940,7 +4973,9 @@ class FinanceiroController extends Controller
         $user           = User::where("id",$user_id);
         $contrato       = ContratoEmpresarial::find($contrato_id);
         $comissao       = Comissoes::where("contrato_empresarial_id",$contrato_id)->first();
-        ComissoesCorretoresLancadas::where("comissoes_id",$comissao->id)->update(["valor" => 0]);
+        ComissoesCorretoresLancadas::where("comissoes_id",$comissao->id)->update(["valor" => 0, "desconto" => 0]);
+        // Desconto do vendedor: gravado UMA vez, na primeira parcela com valor
+        $descontoChangePendente = (float) ($contrato->desconto_corretor ?? 0);
         if ($user->first()->clt == 1) {
 
             $dados = ComissoesCorretoresDefault
@@ -4956,6 +4991,10 @@ class FinanceiroController extends Controller
                 //$comissaoVendedor->comissoes_id = $comissao->id;
                 //$comissaoVendedor->parcela = $c->parcela;
                 $comissaoVendedor->valor = ($valor_comissao_default * $c->valor) / 100;
+                if ($comissaoVendedor->valor > 0 && $descontoChangePendente > 0) {
+                    $comissaoVendedor->desconto = $descontoChangePendente;
+                    $descontoChangePendente = 0;
+                }
                 $comissaoVendedor->save();
             }
 
@@ -4978,6 +5017,10 @@ class FinanceiroController extends Controller
                     $valor_comissao = $contrato->valor_plano;
                     $comissaoVendedor = ComissoesCorretoresLancadas::where("comissoes_id",$comissao->id)->where("parcela",$c->parcela)->first();
                     $comissaoVendedor->valor = ($valor_comissao * $c->valor) / 100;
+                    if ($comissaoVendedor->valor > 0 && $descontoChangePendente > 0) {
+                        $comissaoVendedor->desconto = $descontoChangePendente;
+                        $descontoChangePendente = 0;
+                    }
                     $comissaoVendedor->save();
                     //$comissao_corretor_contagem++;
                 }
@@ -4995,6 +5038,10 @@ class FinanceiroController extends Controller
                     $valor_comissao = $contrato->valor_plano;
                     $comissaoVendedor = ComissoesCorretoresLancadas::where("comissoes_id",$comissao->id)->where("parcela",$c->parcela)->first();
                     $comissaoVendedor->valor = ($valor_comissao * $c->valor) / 100;
+                    if ($comissaoVendedor->valor > 0 && $descontoChangePendente > 0) {
+                        $comissaoVendedor->desconto = $descontoChangePendente;
+                        $descontoChangePendente = 0;
+                    }
                     $comissaoVendedor->save();
 
                 }
@@ -5023,6 +5070,9 @@ class FinanceiroController extends Controller
         $comissao = Comissoes::where('contrato_id',$contrato->id)->first();
         $corretora_id = User::find($user_id)->corretora_id;
         $user = User::find($user_id);
+
+        // Coletivo: desconto do vendedor ja embutido no valor — zera o campo por parcela
+        ComissoesCorretoresLancadas::where("comissoes_id",$comissao->id)->update(["desconto" => 0]);
 
         if ($user->first()->clt == 1) {
 
@@ -5112,7 +5162,7 @@ class FinanceiroController extends Controller
 
         $corretora_id = User::find($user_id)->corretora_id;
 
-        ComissoesCorretoresLancadas::where("comissoes_id",$comissao->id)->update(["valor" => 0]);
+        ComissoesCorretoresLancadas::where("comissoes_id",$comissao->id)->update(["valor" => 0, "desconto" => 0]);
         if ($user->first()->clt == 1) {///SE AQUI O CORRETOR E CLT
 
             $dados = ComissoesCorretoresDefault

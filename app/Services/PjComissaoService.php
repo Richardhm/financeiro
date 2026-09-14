@@ -122,10 +122,13 @@ class PjComissaoService
 
         foreach ($todasParcelas as $comissaoId => $parcelas) {
             // Base = SEMPRE o valor_plano do contrato (mensalidade, sem taxa de adesão)
-            $base = (float) DB::table('comissoes as c')
+            $contratoInfo = DB::table('comissoes as c')
                 ->join('contratos as ct', 'ct.id', '=', 'c.contrato_id')
                 ->where('c.id', $comissaoId)
-                ->value('ct.valor_plano');
+                ->select('ct.valor_plano', 'ct.desconto_corretor')
+                ->first();
+            $base = (float) ($contratoInfo->valor_plano ?? 0);
+            $descontoContrato = (float) ($contratoInfo->desconto_corretor ?? 0);
             if (!$base || $base <= 0) {
                 $base = (float) $parcelas->max('valor_pago') - 35;
             }
@@ -150,7 +153,7 @@ class PjComissaoService
             });
             $idsTodas = $aplicaveis->whereIn('parcela', [1, 2, 3, 4, 5, 6])->pluck('id');
             if ($idsTodas->isNotEmpty()) {
-                DB::table('comissoes_corretores_lancadas')->whereIn('id', $idsTodas)->update(['valor' => 0, 'porcentagem_paga' => null]);
+                DB::table('comissoes_corretores_lancadas')->whereIn('id', $idsTodas)->update(['valor' => 0, 'porcentagem_paga' => null, 'desconto' => 0]);
             }
 
             // Adiantamento (pct 100) ja pago numa parcela finalizada? Entao nao
@@ -169,6 +172,14 @@ class PjComissaoService
                 5 => 'parcela_5_pct',
                 6 => 'parcela_6_pct',
             ];
+            // O desconto do vendedor (ct.desconto_corretor) e cobrado UMA vez por
+            // contrato: gravado na primeira parcela que recebe valor, no campo
+            // ccl.desconto — e a folha subtrai somente ccl.desconto.
+            // Se uma parcela finalizada ja carregou o desconto, nao cobra de novo.
+            $jaCobrouDesconto = $parcelas->contains(
+                fn($p) => (int) ($p->finalizado ?? 0) === 1 && (float) ($p->desconto ?? 0) > 0
+            );
+            $descontoPendente = $jaCobrouDesconto ? 0 : $descontoContrato;
             foreach ($campos as $n => $campo) {
                 $pct = (float) ($regra->$campo ?? 0);
                 if ($pct <= 0) continue;
@@ -180,7 +191,9 @@ class PjComissaoService
                         ->update([
                             'valor'            => round($base * $pct / 100, 2),
                             'porcentagem_paga' => $pct,
+                            'desconto'         => $descontoPendente,
                         ]);
+                    $descontoPendente = 0;
                 }
             }
         }
