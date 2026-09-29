@@ -206,7 +206,7 @@ $(document).ready(function(){
                 const planoSelecionado = $("#valor_plano_id_clicado").val(); // Plano selecionado na visualização
                 console.log("PLano ",planoSelecionado);
                 const detalhesResponse = await fetch(
-                    `/folha/api/clientes-corretor?corretor_id=${corretorId}&plano_id=${planoSelecionado}`
+                    `/folha/api/clientes-corretor?corretor_id=${corretorId}&plano_id=${planoSelecionado}${window.PARCEIROS_MODE ? '&modo=parceiro' : ''}`
                 );
                 const detalhesData = await detalhesResponse.json();
 

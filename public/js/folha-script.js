@@ -256,7 +256,8 @@ async function carregarDetalhesCorretor(corretorId, planoId = '1') {
     DOM.detalhesConteudo.classList.add('hidden');
 
     try {
-        const response = await fetch(`/folha/api/clientes-corretor?corretor_id=${corretorId}&plano_id=${planoId}`);
+        const modoDet = window.PARCEIROS_MODE ? '&modo=parceiro' : '';
+        const response = await fetch(`/folha/api/clientes-corretor?corretor_id=${corretorId}&plano_id=${planoId}${modoDet}`);
         const data = await response.json();
         await renderizarDetalhesCorretor(data,planoId);
     } catch (error) {

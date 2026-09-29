@@ -26,9 +26,9 @@
             var PARCEIROS_MODE = true;
             var URL_FINALIZAR_PARCEIRO_BASE = "{{ url('/folha/folha-parceiros') }}";
         </script>
-        <script src="{{asset('js/folha-script.js')}}"></script>
-        <script src="{{asset('js/folha-jquery.js')}}"></script>
-        <script src="{{asset('js/renderizar-detalhe.js')}}"></script>
+        <script src="{{asset('js/folha-script.js')}}?v={{ filemtime(public_path('js/folha-script.js')) }}"></script>
+        <script src="{{asset('js/folha-jquery.js')}}?v={{ filemtime(public_path('js/folha-jquery.js')) }}"></script>
+        <script src="{{asset('js/renderizar-detalhe.js')}}?v={{ filemtime(public_path('js/renderizar-detalhe.js')) }}"></script>
     @endsection
 
 </x-app-layout>

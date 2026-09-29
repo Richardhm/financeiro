@@ -51,7 +51,7 @@ window.atualizarCardsComResumo = atualizarCardsComResumo;
 /* ===== ATUALIZA CARD E LISTING COM DADOS DO DB ===== */
 async function atualizarCardConfirmadosFromDB(corretorId) {
     try {
-        const r    = await fetch(`/folha/api/clientes-corretor?corretor_id=${corretorId}&plano_id=confirmados`);
+        const r    = await fetch(`/folha/api/clientes-corretor?corretor_id=${corretorId}&plano_id=confirmados&modo=parceiro`);
         const data = await r.json();
         if (!data.success) return null;
 
@@ -134,7 +134,7 @@ document.addEventListener('click', async function (e) {
                 // Atualiza totais visíveis na tabela confirmados
                 const totalEl = document.getElementById('conf-table-total');
                 const countEl = document.getElementById('conf-table-count');
-                const r2 = await fetch(`/folha/api/clientes-corretor?corretor_id=${corretorAtualDetalhes}&plano_id=confirmados`);
+                const r2 = await fetch(`/folha/api/clientes-corretor?corretor_id=${corretorAtualDetalhes}&plano_id=confirmados&modo=parceiro`);
                 const d2 = await r2.json();
                 const conf = d2.resumo?.confirmados;
                 if (totalEl) totalEl.textContent = formatMoney(conf?.valor_total || 0);
@@ -711,7 +711,7 @@ async function renderizarDetalhesCorretor(data, planoSelecionado = '1') {
     // Em PARCEIROS_MODE, primeiro card = Confirmados (carregado do DB)
     if (window.PARCEIROS_MODE) {
         try {
-            const r  = await fetch(`/folha/api/clientes-corretor?corretor_id=${corretorAtualDetalhes}&plano_id=confirmados`);
+            const r  = await fetch(`/folha/api/clientes-corretor?corretor_id=${corretorAtualDetalhes}&plano_id=confirmados&modo=parceiro`);
             const d  = await r.json();
             const resumoConf    = d.resumo?.confirmados;
             const totalValeInit = parseFloat(d.resumo?.vale?.total_comissao || 0);
@@ -774,7 +774,7 @@ async function atualizarTabelaClientes(data) {
     // ── Confirmados (carrega do DB) ──
     if (tipo === 'confirmados') {
         try {
-            const r  = await fetch(`/folha/api/clientes-corretor?corretor_id=${corretorAtualDetalhes}&plano_id=confirmados`);
+            const r  = await fetch(`/folha/api/clientes-corretor?corretor_id=${corretorAtualDetalhes}&plano_id=confirmados&modo=parceiro`);
             const d  = await r.json();
             const resumoConf    = d.resumo?.confirmados;
             const totalValeTab  = parseFloat(d.resumo?.vale?.total_comissao || 0);
