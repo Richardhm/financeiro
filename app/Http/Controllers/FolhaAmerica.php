@@ -22,6 +22,10 @@ use phpDocumentor\Reflection\DocBlock\Tags\Author;
 
 class FolhaAmerica extends Controller
 {
+    // Folha dos PARCEIROS considera apenas clientes cadastrados desta data em diante
+    // (contratos antigos/legado ficam fora das telas do parceiro)
+    private const PARCEIRO_CLIENTES_DESDE = '2026-01-01';
+
     private $corretora_id = 1;
     private $plano_id = 1;
     public function __construct()
@@ -310,9 +314,16 @@ class FolhaAmerica extends Controller
 
         $confirmadosBruto = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
+            ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
+            ->leftJoin('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
             ->where('ccl.status_apto_pagar', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->whereIn('c.user_id', $parceirosIds)
+            // Parceiros: apenas clientes cadastrados de 2026 em diante
+            ->where(function ($q) {
+                $q->where('ct.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE)
+                  ->orWhere('ce.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE);
+            })
             ->groupBy('c.user_id')
             ->select('c.user_id', DB::raw('SUM(ccl.valor) as total_confirmado'))
             ->pluck('total_confirmado', 'c.user_id');
@@ -391,6 +402,11 @@ class FolhaAmerica extends Controller
                 ->where('ccl.valor', '!=', 0)
                 ->where('ccl.finalizado', '!=', 1)
                 ->where('ccl.status_apto_pagar', 1)
+                // Parceiros: apenas clientes cadastrados de 2026 em diante
+                ->where(function ($q) {
+                    $q->where('ctc.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE)
+                      ->orWhere('ctec.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE);
+                })
                 ->select('ccl.id', 'ccl.valor')
                 ->get();
 
@@ -813,6 +829,11 @@ class FolhaAmerica extends Controller
                 ->where('c.user_id', $corretorId)
                 ->where('ccl.status_apto_pagar', 1)
                 ->where('ccl.finalizado', '!=', 1)
+                // Parceiros: apenas clientes cadastrados de 2026 em diante
+                ->where(function ($q) {
+                    $q->where('ct.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE)
+                      ->orWhere('ce.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE);
+                })
                 ->orderBy('cliente_nome')
                 ->get();
 
@@ -1044,6 +1065,8 @@ class FolhaAmerica extends Controller
                             });
                     }
                 })
+                // Parceiros: apenas clientes cadastrados de 2026 em diante
+                ->when($modo === 'parceiro', fn($q) => $q->where('ct.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE))
 
                 ->get();
 
@@ -1094,6 +1117,8 @@ class FolhaAmerica extends Controller
                             });
                     }
                 })
+                // Parceiros: apenas clientes cadastrados de 2026 em diante
+                ->when($modo === 'parceiro', fn($q) => $q->where('ce.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE))
                 ->get();
 
             $dados = $dados->concat($dadosEmp)->sortBy('cliente_nome')->values();
@@ -1143,6 +1168,13 @@ class FolhaAmerica extends Controller
             // exige apenas a baixa do cliente (status_financeiro), nao a do gerente
             ->when($planoId != "estorno" && $planoId != "desconto" && $modo !== 'parceiro', function ($q) {
                 $q->where('ccl.status_gerente', 1);
+            })
+            // Parceiros: apenas clientes cadastrados de 2026 em diante
+            ->when($modo === 'parceiro' && ($planoId == 1 || $planoId == 3), function ($q) {
+                $q->where('ct.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE);
+            })
+            ->when($modo === 'parceiro' && $planoId != 1 && $planoId != 3, function ($q) {
+                $q->where('ce.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE);
             })
             ->when($planoId != "estorno" && $planoId != "desconto", function ($q) {
                 $q->where(function ($query) {
@@ -1443,6 +1475,8 @@ class FolhaAmerica extends Controller
             ->where('ct.plano_id', 1)
             ->where('c.user_id', $corretorId)
             ->when($exigeGerente, fn($q) => $q->where('ccl.status_gerente', 1))
+            // Parceiros: apenas clientes cadastrados de 2026 em diante
+            ->when($modo === 'parceiro', fn($q) => $q->where('ct.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE))
             ->where('ccl.status_financeiro', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->where('ccl.folha', 1)
@@ -1487,6 +1521,8 @@ class FolhaAmerica extends Controller
             ->where('c.user_id', $corretorId) // Associado ao corretor atual
             ->where('ccl.valor', '!=', 0) // Exclui registros com valor 0
             ->where('ccl.finalizado', '!=', 1) // Exclui finalizados
+            // Parceiros: apenas clientes cadastrados de 2026 em diante
+            ->when($modo === 'parceiro', fn($q) => $q->where('ct.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE))
             ->first(); // Retorna apenas um registro agregado
 
         // Nao Recebido tambem soma contratos EMPRESARIAIS (antes so individual)
@@ -1512,6 +1548,8 @@ class FolhaAmerica extends Controller
             ->where('c.user_id', $corretorId)
             ->where('ccl.valor', '!=', 0)
             ->where('ccl.finalizado', '!=', 1)
+            // Parceiros: apenas clientes cadastrados de 2026 em diante
+            ->when($modo === 'parceiro', fn($q) => $q->where('ce.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE))
             ->first();
 
         if ($adiantamento) {
@@ -1850,6 +1888,8 @@ class FolhaAmerica extends Controller
             ->where('ct.plano_id', 1)
             ->where('c.user_id', $corretorId)
             ->when($exigeGerente, fn($q) => $q->where('ccl.status_gerente', 1))
+            // Parceiros: apenas clientes cadastrados de 2026 em diante
+            ->when($modo === 'parceiro', fn($q) => $q->where('ct.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE))
             ->where('ccl.status_financeiro', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->where('ccl.folha', 1)
@@ -1869,6 +1909,8 @@ class FolhaAmerica extends Controller
             ->where('ct.plano_id', 3)
             ->where('c.user_id', $corretorId)
             ->when($exigeGerente, fn($q) => $q->where('ccl.status_gerente', 1))
+            // Parceiros: apenas clientes cadastrados de 2026 em diante
+            ->when($modo === 'parceiro', fn($q) => $q->where('ct.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE))
             ->where('ccl.status_financeiro', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->where('ccl.folha', 1)
@@ -1887,6 +1929,8 @@ class FolhaAmerica extends Controller
             ->whereNotIn('ce.plano_id', [1, 3])
             ->where('c.user_id', $corretorId)
             ->when($exigeGerente, fn($q) => $q->where('ccl.status_gerente', 1))
+            // Parceiros: apenas clientes cadastrados de 2026 em diante
+            ->when($modo === 'parceiro', fn($q) => $q->where('ce.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE))
             ->where('ccl.status_financeiro', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->where('ccl.folha', 1)
@@ -1925,6 +1969,8 @@ class FolhaAmerica extends Controller
             ->where('c.user_id', $corretorId) // Associado ao corretor atual
             ->where('ccl.valor', '!=', 0) // Exclui registros com valor 0
             ->where('ccl.finalizado', '!=', 1) // Exclui finalizados
+            // Parceiros: apenas clientes cadastrados de 2026 em diante
+            ->when($modo === 'parceiro', fn($q) => $q->where('ct.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE))
             ->first(); // Retorna apenas um registro agregado
 
         // Nao Recebido tambem soma contratos EMPRESARIAIS (antes so individual)
@@ -1950,6 +1996,8 @@ class FolhaAmerica extends Controller
             ->where('c.user_id', $corretorId)
             ->where('ccl.valor', '!=', 0)
             ->where('ccl.finalizado', '!=', 1)
+            // Parceiros: apenas clientes cadastrados de 2026 em diante
+            ->when($modo === 'parceiro', fn($q) => $q->where('ce.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE))
             ->first();
 
         if ($adiantamento) {
@@ -2093,6 +2141,11 @@ class FolhaAmerica extends Controller
                     ->where('ccl.valor', '!=', 0)
                     ->where('ccl.finalizado', '!=', 1)
                     ->when($isParceiro, fn($q) => $q->where('ccl.status_apto_pagar', 1))
+                    // Parceiros: apenas clientes cadastrados de 2026 em diante
+                    ->when($isParceiro, fn($q) => $q->where(function ($q2) {
+                        $q2->where('ctc.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE)
+                           ->orWhere('ctec.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE);
+                    }))
                     ->when(!$isParceiro, fn($q) => $q->where('ccl.folha', 1)->whereNull('ccl.data_baixa_gerente_folha'))
                     ->where(function ($query) {
                         $query->whereNotNull('c.contrato_id')
@@ -2327,6 +2380,11 @@ class FolhaAmerica extends Controller
                     })
                     ->where('ccl.finalizado', '!=', 1)
                     ->when($isParceiro, fn($q) => $q->where('ccl.status_apto_pagar', 1))
+                    // Parceiros: apenas clientes cadastrados de 2026 em diante
+                    ->when($isParceiro, fn($q) => $q->where(function ($q2) {
+                        $q2->where('ctc.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE)
+                           ->orWhere('ctec.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE);
+                    }))
                     ->when(!$isParceiro, fn($q) => $q->where('ccl.folha', 1)->whereNull('ccl.data_baixa_gerente_folha'))
                     ->where(function ($query) {
                         $query->whereNotNull('c.contrato_id')
@@ -3341,7 +3399,13 @@ class FolhaAmerica extends Controller
 
         // Filtro por tipo de contrato
         if ($tipoContrato === 'parceiro') {
-            $query->where('u.tipo_contrato', 'parceiro');
+            $query->where('u.tipo_contrato', 'parceiro')
+                // Parceiros: apenas clientes cadastrados de 2026 em diante
+                ->where(function ($q) {
+                    $q->whereNull('c.id')
+                      ->orWhere('ct.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE)
+                      ->orWhere('cte.created_at', '>=', self::PARCEIRO_CLIENTES_DESDE);
+                });
         } else {
             $query->where('u.tipo_contrato', '!=', 'parceiro');
         }
