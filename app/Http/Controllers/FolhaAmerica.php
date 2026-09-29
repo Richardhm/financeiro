@@ -385,8 +385,9 @@ class FolhaAmerica extends Controller
                 })
                     ->where(fn($q2) => $q2->whereNotNull("ctc.id")->orWhereNotNull("ctec.id"))
                 ->where('c.user_id', $parceiroId)
+                // Parceiro recebe independente do repasse da operadora:
+                // exige apenas a baixa do cliente (status_financeiro)
                 ->where('ccl.status_financeiro', 1)
-                ->where('ccl.status_gerente', 1)
                 ->where('ccl.valor', '!=', 0)
                 ->where('ccl.finalizado', '!=', 1)
                 ->where('ccl.status_apto_pagar', 1)
@@ -826,7 +827,7 @@ class FolhaAmerica extends Controller
                 'total'      => $dados->sum('valor_comissao'),
                 'tipo'       => 'confirmados',
                 'frase'      => 'Confirmados',
-                'resumo'     => $this->obterResumoPorPlanoCorretor($corretorId),
+                'resumo'     => $this->obterResumoPorPlanoCorretor($corretorId, $modo),
                 'frequencia' => $configParceiro?->frequencia ?? 'mensal',
                 'odonto'     => false,
                 'desconto'   => false,
@@ -911,7 +912,7 @@ class FolhaAmerica extends Controller
                 'corretor' => $corretor,
                 'total' => $clientes->sum('valor_comissao'),
                 'tipo' => 'estorno',
-                'resumo' => $this->obterResumoPorPlanoCorretor($corretorId),
+                'resumo' => $this->obterResumoPorPlanoCorretor($corretorId, $modo),
                 'odonto' => false,
                 'desconto' => false,
                 'frase' => "Estorno - " . ($corretor->name ?? ''),
@@ -938,7 +939,7 @@ class FolhaAmerica extends Controller
                 'clientes' => $resultadoOdonto,
                 'corretor' => $corretor,
                 'total' => $total,
-                'resumo' => $this->obterResumoPorPlanoCorretor($corretorId),
+                'resumo' => $this->obterResumoPorPlanoCorretor($corretorId, $modo),
                 'odonto' => true,
                 'desconto' => false,
                 'frase' => $frase
@@ -1017,6 +1018,7 @@ class FolhaAmerica extends Controller
             CASE
                 WHEN ccl.status_financeiro = 1 AND ccl.status_gerente = 0 THEN 'cliente_pago'
                 WHEN ccl.status_financeiro = 0 AND ccl.status_gerente = 1 THEN 'operadora_pagou'
+                WHEN ccl.status_financeiro = 0 AND ccl.status_gerente = 0 THEN 'sem_baixa'
                 ELSE NULL
             END as resposta
         ")
@@ -1024,15 +1026,23 @@ class FolhaAmerica extends Controller
                 ->where('c.user_id', $corretorId)
                 ->where('ccl.valor', '!=', 0) // Filtra onde valor > 0
                 ->where('ccl.finalizado', '!=', 1) // Exclui registros finalizados
-                ->where(function ($query) {
-                    $query->where(function ($query) {
-                        $query->where('ccl.status_financeiro', 1)
-                            ->where('ccl.status_gerente', 0);
-                    })
-                        ->orWhere(function ($query) {
-                            $query->where('ccl.status_financeiro', 0)
-                                ->where('ccl.status_gerente', 1);
-                        });
+                ->where(function ($query) use ($modo) {
+                    if ($modo === 'parceiro') {
+                        // Parceiro: a aba lista tudo que o CLIENTE ainda nao pagou
+                        // (com ou sem baixa da operadora — antes as parcelas sem
+                        // nenhuma baixa eram invisiveis em todas as abas).
+                        // Parcelas com cliente pago (sf=1) vao direto para as abas de baixa.
+                        $query->where('ccl.status_financeiro', 0);
+                    } else {
+                        $query->where(function ($query) {
+                            $query->where('ccl.status_financeiro', 1)
+                                ->where('ccl.status_gerente', 0);
+                        })
+                            ->orWhere(function ($query) {
+                                $query->where('ccl.status_financeiro', 0)
+                                    ->where('ccl.status_gerente', 1);
+                            });
+                    }
                 })
 
                 ->get();
@@ -1061,6 +1071,7 @@ class FolhaAmerica extends Controller
                         CASE
                             WHEN ccl.status_financeiro = 1 AND ccl.status_gerente = 0 THEN 'cliente_pago'
                             WHEN ccl.status_financeiro = 0 AND ccl.status_gerente = 1 THEN 'operadora_pagou'
+                            WHEN ccl.status_financeiro = 0 AND ccl.status_gerente = 0 THEN 'sem_baixa'
                             ELSE NULL
                         END as resposta
                     ")
@@ -1068,15 +1079,20 @@ class FolhaAmerica extends Controller
                 ->where('c.user_id', $corretorId)
                 ->where('ccl.valor', '!=', 0)
                 ->where('ccl.finalizado', '!=', 1)
-                ->where(function ($query) {
-                    $query->where(function ($query) {
-                        $query->where('ccl.status_financeiro', 1)
-                            ->where('ccl.status_gerente', 0);
-                    })
-                        ->orWhere(function ($query) {
-                            $query->where('ccl.status_financeiro', 0)
-                                ->where('ccl.status_gerente', 1);
-                        });
+                ->where(function ($query) use ($modo) {
+                    if ($modo === 'parceiro') {
+                        // Parceiro: a aba lista tudo que o CLIENTE ainda nao pagou
+                        $query->where('ccl.status_financeiro', 0);
+                    } else {
+                        $query->where(function ($query) {
+                            $query->where('ccl.status_financeiro', 1)
+                                ->where('ccl.status_gerente', 0);
+                        })
+                            ->orWhere(function ($query) {
+                                $query->where('ccl.status_financeiro', 0)
+                                    ->where('ccl.status_gerente', 1);
+                            });
+                    }
                 })
                 ->get();
 
@@ -1123,7 +1139,9 @@ class FolhaAmerica extends Controller
                 );
         }
         $clientes = $query->where('c.user_id', $corretorId)
-            ->when($planoId != "estorno" && $planoId != "desconto", function ($q) {
+            // Parceiro recebe independente do repasse da operadora: modo parceiro
+            // exige apenas a baixa do cliente (status_financeiro), nao a do gerente
+            ->when($planoId != "estorno" && $planoId != "desconto" && $modo !== 'parceiro', function ($q) {
                 $q->where('ccl.status_gerente', 1);
             })
             ->when($planoId != "estorno" && $planoId != "desconto", function ($q) {
@@ -1183,7 +1201,7 @@ class FolhaAmerica extends Controller
             'corretor' => $corretor,
             'total' => $total,
             'tipo' => $tipo,
-            'resumo' => $this->obterResumoPorPlanoCorretor($corretorId),
+            'resumo' => $this->obterResumoPorPlanoCorretor($corretorId, $modo),
             'odonto' => false,
             'desconto' => false,
             'frase' => $frase,
@@ -1350,13 +1368,20 @@ class FolhaAmerica extends Controller
             }
 
             // Atualizar os campos necessÃ¡rios
+            // Confirmar como recebida = completar AS DUAS baixas que faltarem
+            // (cliente e operadora) — cobre tambem parcelas sem nenhuma baixa
+            $updates = ['manualmente' => 1];
+            if (!$comissao->status_gerente) {
+                $updates['status_gerente'] = 1;
+                $updates['data_baixa_gerente'] = now();
+            }
+            if (!$comissao->status_financeiro) {
+                $updates['status_financeiro'] = 1;
+                $updates['data_baixa'] = now();
+            }
             DB::table('comissoes_corretores_lancadas')
                 ->where('id', $id)
-                ->update([
-                    'status_gerente' => 1,
-                    'data_baixa_gerente' => now(),
-                    'manualmente' => 1,
-                ]);
+                ->update($updates);
 
             return response()->json([
                 'success' => true,
@@ -1384,7 +1409,7 @@ class FolhaAmerica extends Controller
 
         try {
             // Obter o resumo por planos (esta Ã© uma funÃ§Ã£o que vocÃª jÃ¡ pode ter pronta)
-            $resumo = $this->obterResumoPorPlanoCorretorAtualizado($corretorId);
+            $resumo = $this->obterResumoPorPlanoCorretorAtualizado($corretorId, $request->get('modo', ''));
 
             // Calcular o resumo geral
             $resumoGeral = [
@@ -1406,8 +1431,10 @@ class FolhaAmerica extends Controller
         }
     }
 
-    private function obterResumoPorPlanoCorretorAtualizado($corretorId)
+    private function obterResumoPorPlanoCorretorAtualizado($corretorId, $modo = null)
     {
+        // Modo parceiro: exige apenas a baixa do cliente (status_financeiro)
+        $exigeGerente = ($modo !== 'parceiro');
         $individual = DB::table('comissoes_corretores_lancadas as ccl')
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->join('contratos as ct', 'c.contrato_id', '=', 'ct.id')
@@ -1415,7 +1442,7 @@ class FolhaAmerica extends Controller
             ->join('clientes as cl', 'ct.cliente_id', '=', 'cl.id')
             ->where('ct.plano_id', 1)
             ->where('c.user_id', $corretorId)
-            ->where('ccl.status_gerente', 1)
+            ->when($exigeGerente, fn($q) => $q->where('ccl.status_gerente', 1))
             ->where('ccl.status_financeiro', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->where('ccl.folha', 1)
@@ -1441,15 +1468,21 @@ class FolhaAmerica extends Controller
         SUM(cl.quantidade_vidas) as total_vidas,
         SUM(ccl.valor) as valor_total
     ')
-            ->where(function ($query) {
-                $query->where(function ($query) {
-                    $query->where('ccl.status_financeiro', 1)
-                        ->where('ccl.status_gerente', 0);
-                })
-                    ->orWhere(function ($query) {
-                        $query->where('ccl.status_financeiro', 0)
-                            ->where('ccl.status_gerente', 1);
-                    });
+            ->where(function ($query) use ($modo) {
+                if ($modo === 'parceiro') {
+                    // Parceiro: Nao Recebido = tudo que o cliente ainda nao pagou
+                    // (com ou sem baixa da operadora)
+                    $query->where('ccl.status_financeiro', 0);
+                } else {
+                    $query->where(function ($query) {
+                        $query->where('ccl.status_financeiro', 1)
+                            ->where('ccl.status_gerente', 0);
+                    })
+                        ->orWhere(function ($query) {
+                            $query->where('ccl.status_financeiro', 0)
+                                ->where('ccl.status_gerente', 1);
+                        });
+                }
             })
             ->where('c.user_id', $corretorId) // Associado ao corretor atual
             ->where('ccl.valor', '!=', 0) // Exclui registros com valor 0
@@ -1462,15 +1495,19 @@ class FolhaAmerica extends Controller
             ->join('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
             ->where('ce.financeiro_id', '!=', 12)
             ->selectRaw('COUNT(DISTINCT ce.id) as total_contratos, SUM(ce.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
-            ->where(function ($query) {
-                $query->where(function ($query) {
-                    $query->where('ccl.status_financeiro', 1)
-                        ->where('ccl.status_gerente', 0);
-                })
-                    ->orWhere(function ($query) {
-                        $query->where('ccl.status_financeiro', 0)
-                            ->where('ccl.status_gerente', 1);
-                    });
+            ->where(function ($query) use ($modo) {
+                if ($modo === 'parceiro') {
+                    $query->where('ccl.status_financeiro', 0);
+                } else {
+                    $query->where(function ($query) {
+                        $query->where('ccl.status_financeiro', 1)
+                            ->where('ccl.status_gerente', 0);
+                    })
+                        ->orWhere(function ($query) {
+                            $query->where('ccl.status_financeiro', 0)
+                                ->where('ccl.status_gerente', 1);
+                        });
+                }
             })
             ->where('c.user_id', $corretorId)
             ->where('ccl.valor', '!=', 0)
@@ -1769,8 +1806,11 @@ class FolhaAmerica extends Controller
         }
     }
 
-    private function obterResumoPorPlanoCorretor($corretorId)
+    private function obterResumoPorPlanoCorretor($corretorId, $modo = null)
     {
+        // Modo parceiro: parceiro recebe independente do repasse da operadora,
+        // entao os cards exigem apenas a baixa do cliente (status_financeiro)
+        $exigeGerente = ($modo !== 'parceiro');
 
         $resultadoOdonto = DB::table('odonto')
             ->selectRaw('COUNT(*) as total_registros, SUM(comissao) as total_comissao')
@@ -1809,7 +1849,7 @@ class FolhaAmerica extends Controller
             ->selectRaw('COUNT(DISTINCT ct.id) as total_contratos, SUM(cc.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
             ->where('ct.plano_id', 1)
             ->where('c.user_id', $corretorId)
-            ->where('ccl.status_gerente', 1)
+            ->when($exigeGerente, fn($q) => $q->where('ccl.status_gerente', 1))
             ->where('ccl.status_financeiro', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->where('ccl.folha', 1)
@@ -1828,7 +1868,7 @@ class FolhaAmerica extends Controller
             ->selectRaw('COUNT(DISTINCT ct.id) as total_contratos, SUM(cc.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
             ->where('ct.plano_id', 3)
             ->where('c.user_id', $corretorId)
-            ->where('ccl.status_gerente', 1)
+            ->when($exigeGerente, fn($q) => $q->where('ccl.status_gerente', 1))
             ->where('ccl.status_financeiro', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->where('ccl.folha', 1)
@@ -1846,7 +1886,7 @@ class FolhaAmerica extends Controller
             ->selectRaw('COUNT(DISTINCT ce.id) as total_contratos, SUM(ce.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
             ->whereNotIn('ce.plano_id', [1, 3])
             ->where('c.user_id', $corretorId)
-            ->where('ccl.status_gerente', 1)
+            ->when($exigeGerente, fn($q) => $q->where('ccl.status_gerente', 1))
             ->where('ccl.status_financeiro', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->where('ccl.folha', 1)
@@ -1866,15 +1906,21 @@ class FolhaAmerica extends Controller
         SUM(cl.quantidade_vidas) as total_vidas,
         SUM(ccl.valor) as valor_total
     ')
-            ->where(function ($query) {
-                $query->where(function ($query) {
-                    $query->where('ccl.status_financeiro', 1)
-                        ->where('ccl.status_gerente', 0);
-                })
-                    ->orWhere(function ($query) {
-                        $query->where('ccl.status_financeiro', 0)
-                            ->where('ccl.status_gerente', 1);
-                    });
+            ->where(function ($query) use ($modo) {
+                if ($modo === 'parceiro') {
+                    // Parceiro: Nao Recebido = tudo que o cliente ainda nao pagou
+                    // (com ou sem baixa da operadora)
+                    $query->where('ccl.status_financeiro', 0);
+                } else {
+                    $query->where(function ($query) {
+                        $query->where('ccl.status_financeiro', 1)
+                            ->where('ccl.status_gerente', 0);
+                    })
+                        ->orWhere(function ($query) {
+                            $query->where('ccl.status_financeiro', 0)
+                                ->where('ccl.status_gerente', 1);
+                        });
+                }
             })
             ->where('c.user_id', $corretorId) // Associado ao corretor atual
             ->where('ccl.valor', '!=', 0) // Exclui registros com valor 0
@@ -1887,15 +1933,19 @@ class FolhaAmerica extends Controller
             ->join('contrato_empresarial as ce', 'c.contrato_empresarial_id', '=', 'ce.id')
             ->where('ce.financeiro_id', '!=', 12)
             ->selectRaw('COUNT(DISTINCT ce.id) as total_contratos, SUM(ce.quantidade_vidas) as total_vidas, SUM(ccl.valor) as valor_total')
-            ->where(function ($query) {
-                $query->where(function ($query) {
-                    $query->where('ccl.status_financeiro', 1)
-                        ->where('ccl.status_gerente', 0);
-                })
-                    ->orWhere(function ($query) {
-                        $query->where('ccl.status_financeiro', 0)
-                            ->where('ccl.status_gerente', 1);
-                    });
+            ->where(function ($query) use ($modo) {
+                if ($modo === 'parceiro') {
+                    $query->where('ccl.status_financeiro', 0);
+                } else {
+                    $query->where(function ($query) {
+                        $query->where('ccl.status_financeiro', 1)
+                            ->where('ccl.status_gerente', 0);
+                    })
+                        ->orWhere(function ($query) {
+                            $query->where('ccl.status_financeiro', 0)
+                                ->where('ccl.status_gerente', 1);
+                        });
+                }
             })
             ->where('c.user_id', $corretorId)
             ->where('ccl.valor', '!=', 0)
@@ -2037,7 +2087,8 @@ class FolhaAmerica extends Controller
                     })
                         ->where(fn($q2) => $q2->whereNotNull("ctc.id")->orWhereNotNull("ctec.id"))
                     ->where('c.user_id', $corretorId)
-                    ->where('ccl.status_gerente', 1)
+                    // Parceiro recebe independente do repasse da operadora (sem exigir status_gerente)
+                    ->when(!$isParceiro, fn($q) => $q->where('ccl.status_gerente', 1))
                     ->where('ccl.status_financeiro', 1)
                     ->where('ccl.valor', '!=', 0)
                     ->where('ccl.finalizado', '!=', 1)
@@ -2267,7 +2318,8 @@ class FolhaAmerica extends Controller
                     })
                         ->where(fn($q2) => $q2->whereNotNull("ctc.id")->orWhereNotNull("ctec.id"))
                     ->where('c.user_id', $corretorId)
-                    ->where('ccl.status_gerente', 1)
+                    // Parceiro recebe independente do repasse da operadora (sem exigir status_gerente)
+                    ->when(!$isParceiro, fn($q) => $q->where('ccl.status_gerente', 1))
                     ->where('ccl.status_financeiro', 1)
                     ->where(function ($query) {
                         $query->where('ccl.valor', '!=', 0)
@@ -3210,7 +3262,7 @@ class FolhaAmerica extends Controller
                 'u.tipo_contrato',
                 DB::raw('
                 (
-                    COALESCE(SUM(ccl.valor), 0)
+                    COALESCE(SUM(CASE WHEN ccl.status_financeiro = 1 THEN ccl.valor ELSE 0 END), 0)
                     + IFNULL((SELECT SUM(valor) FROM odonto WHERE user_id = u.id AND pagou = 0), 0)
                     + IFNULL((SELECT SUM(valor) FROM premiacoes WHERE user_id = u.id AND pago = 0), 0)
                     - IFNULL((
@@ -3256,12 +3308,17 @@ class FolhaAmerica extends Controller
                     $join->where('c.plano_id', '=', $plano_id);
                 }
             })
-            ->leftJoin('comissoes_corretores_lancadas as ccl', function ($join) {
+            ->leftJoin('comissoes_corretores_lancadas as ccl', function ($join) use ($tipoContrato) {
                 $join->on('c.id', '=', 'ccl.comissoes_id')
-                    ->where('ccl.status_financeiro', 1)
                     ->where('ccl.finalizado', '!=', 1)
                     ->where('ccl.folha', 1)
                     ->where('ccl.valor', '!=', 0);
+                // Parceiros: inclui tambem parcelas sem baixa do cliente, para o
+                // card do parceiro existir e dar acesso a aba Nao Recebido.
+                // (o total_receber soma apenas as com status_financeiro=1)
+                if ($tipoContrato !== 'parceiro') {
+                    $join->where('ccl.status_financeiro', 1);
+                }
             })
             ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
             ->leftJoin('contrato_empresarial as cte', 'c.contrato_empresarial_id', '=', 'cte.id')
@@ -3295,9 +3352,15 @@ class FolhaAmerica extends Controller
         }
 
         // Agrupar e ordenar
+        // Parceiros: o card aparece tambem quando ha apenas parcelas pendentes
+        // sem baixa do cliente (total 0), para dar acesso a aba Nao Recebido
         $dados = $query
             ->groupBy('u.id', 'u.name', 'u.email', 'u.image', 'u.tipo_contrato')
-            ->having('total_receber', '!=', 0)
+            ->when(
+                $tipoContrato === 'parceiro',
+                fn($q) => $q->havingRaw('total_receber != 0 OR COUNT(ccl.id) > 0'),
+                fn($q) => $q->having('total_receber', '!=', 0)
+            )
             ->orderByDesc('total_receber')
             ->get();
 
@@ -4971,8 +5034,8 @@ class FolhaAmerica extends Controller
             ->join('comissoes as c', 'ccl.comissoes_id', '=', 'c.id')
             ->leftJoin('contratos as ct', 'c.contrato_id', '=', 'ct.id')
             ->where('c.user_id', $parceiroId)
+            // Parceiro recebe independente do repasse da operadora (sem exigir status_gerente)
             ->where('ccl.status_financeiro', 1)
-            ->where('ccl.status_gerente', 1)
             ->where('ccl.finalizado', '!=', 1)
             ->whereNull('ccl.data_baixa_gerente_folha')
             ->select('ccl.id', 'ccl.parcela', 'ccl.valor_pago', 'ccl.comissoes_id', 'c.plano_id', 'ct.valor_plano', 'ct.desconto_corretor')

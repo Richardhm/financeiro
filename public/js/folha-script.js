@@ -287,7 +287,8 @@ async function carregarDetalhesCorretor(corretorId, planoId = '1') {
 
 async function atualizarCardsResumo(corretorId) {
     try {
-        const response = await fetch(`/folha/api/resumo-atualizado?corretor_id=${corretorId}`);
+        const modo = window.PARCEIROS_MODE ? '&modo=parceiro' : '';
+        const response = await fetch(`/folha/api/resumo-atualizado?corretor_id=${corretorId}${modo}`);
         const data = await response.json();
         if (data.success) {
             const resumo = data.resumoPorPlano;
