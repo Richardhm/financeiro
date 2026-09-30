@@ -207,7 +207,7 @@ class FolhaAmerica extends Controller
                     DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano - ((ct.valor_plano * COALESCE(cl.desconto_operadora, 0)) / 100) WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano - ((ce.valor_plano * COALESCE(ce.desconto_operadora, 0)) / 100) ELSE ccl.valor END as valor_plano'),
                     DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                     'ccl.parcela as parcela',
-                    'ccl.data_baixa_gerente as data_vencimento'
+                    DB::raw('COALESCE(ccl.data_baixa_gerente, ccl.data) as data_vencimento')
                 )
                 ->get()
                 ->groupBy('cliente_nome');
@@ -2193,7 +2193,7 @@ class FolhaAmerica extends Controller
                                 ELSE ccl.valor END as valor_plano'),
                             DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                             'ccl.parcela as parcela',
-                            'ccl.data_baixa_gerente as data_vencimento'
+                            DB::raw('COALESCE(ccl.data_baixa_gerente, ccl.data) as data_vencimento')
                         )
                         ->orderByRaw("CASE WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.razao_social ELSE cl.nome END ASC")
                         ->orderBy('ccl.parcela', 'asc')
@@ -2432,7 +2432,7 @@ class FolhaAmerica extends Controller
                                 ELSE ccl.valor END as valor_plano'),
                             DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                             'ccl.parcela as parcela',
-                            'ccl.data_baixa_gerente as data_vencimento'
+                            DB::raw('COALESCE(ccl.data_baixa_gerente, ccl.data) as data_vencimento')
                         )
                         ->orderByRaw("CASE WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.razao_social ELSE cl.nome END ASC")
                         ->orderBy('ccl.parcela', 'asc')
@@ -2895,7 +2895,7 @@ class FolhaAmerica extends Controller
                         DB::raw('CASE WHEN c.contrato_id IS NOT NULL THEN ct.valor_plano - ((ct.valor_plano * COALESCE(cl.desconto_operadora, 0)) / 100) WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.valor_plano - ((ce.valor_plano * COALESCE(ce.desconto_operadora, 0)) / 100) ELSE ccl.valor END as valor_plano'),
                         DB::raw('COALESCE(ccl.desconto, 0) as desconto_corretor'),
                         'ccl.parcela as parcela',
-                        'ccl.data_baixa_gerente as data_vencimento'
+                        DB::raw('COALESCE(ccl.data_baixa_gerente, ccl.data) as data_vencimento')
                     )
                     ->orderByRaw("CASE WHEN c.contrato_empresarial_id IS NOT NULL THEN ce.razao_social ELSE cl.nome END ASC")
                     ->orderBy('ccl.parcela', 'asc')
