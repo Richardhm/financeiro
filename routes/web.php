@@ -165,8 +165,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/folha-america/sincronizar-parcelas', [FolhaAmerica::class, 'sincronizarParcelas'])->name('folha.america.sincronizar');
 
         Route::get('/folha-parceiros', [FolhaAmerica::class, 'indexFolhaParceiros'])->name('folha-parceiros');
-        // BOTAO TEMPORARIO desconto 6,65% (remover junto com o botao e o metodo)
-        Route::post('/folha-parceiros/aplicar-desconto-665', [FolhaAmerica::class, 'aplicarDesconto665Parceiros'])->name('parceiros.desconto665');
         Route::post('/folha-parceiros/{id}/finalizar', [FolhaAmerica::class, 'finalizarParceiro'])->name('folha-parceiros.finalizar');
         Route::get('/folha-parceiros/historico', [FolhaAmerica::class, 'indexHistoricoParceiros'])->name('folha-parceiros.historico');
         Route::post('/folha-parceiros/historico/{id}/pdf', [FolhaAmerica::class, 'gerarPdfHistorico'])->name('folha-parceiros.historico.pdf');

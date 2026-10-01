@@ -5120,48 +5120,6 @@ class FolhaAmerica extends Controller
         return response()->json(['ok' => true]);
     }
 
-    // =========================================================================
-    // BOTAO TEMPORARIO (pedido da backoffice em 01/10/2026): aplica o recalculo
-    // com o desconto de 6,65% APENAS nos parceiros da lista do WhatsApp.
-    // Para remover depois: apagar este metodo, a rota 'parceiros.desconto665'
-    // e o botao em components/folha/conteudo-parceiros.blade.php.
-    // =========================================================================
-    public function aplicarDesconto665Parceiros()
-    {
-        // Lista fixa pedida pela backoffice (comissao Individual):
-        // Ana Paula Garcia (118), Carolina Olinda (18), Brenda Rosa (130),
-        // Emilly (136), Evelly (49), Islene Correia (137), Ivan (119),
-        // Morgana Dorneles (128), Thiago Almeida de Macedo (135)
-        $idsPermitidos = [118, 18, 130, 136, 49, 137, 119, 128, 135];
-
-        $folhaAberta = DB::table('folha_mes')
-            ->where('corretora_id', $this->corretora_id)
-            ->where('status', 0)
-            ->orderByDesc('mes')
-            ->value('mes');
-        $competencia = $folhaAberta ? Carbon::parse($folhaAberta)->format('Y-m') : now()->format('Y-m');
-
-        // Trava dupla: so entra quem esta NA LISTA e tem a opcao 6,65% marcada na regra
-        $parceiros = DB::table('users')
-            ->join('parceiros_regras_comissao as r', 'r.parceiro_id', '=', 'users.id')
-            ->where('users.tipo_contrato', 'parceiro')
-            ->where('users.corretora_id', $this->corretora_id)
-            ->where('r.desconto_665', 1)
-            ->whereIn('users.id', $idsPermitidos)
-            ->distinct()
-            ->pluck('users.name', 'users.id');
-
-        foreach ($parceiros as $id => $nome) {
-            $this->aplicarRegraParceiro((int) $id, $competencia);
-        }
-
-        return response()->json([
-            'success'   => true,
-            'total'     => $parceiros->count(),
-            'parceiros' => $parceiros->values(),
-        ]);
-    }
-
     private function aplicarRegraParceiro(int $parceiroId, string $competencia): void
     {
         $user = DB::table('users')->where('id', $parceiroId)->select('tipo_contrato')->first();
