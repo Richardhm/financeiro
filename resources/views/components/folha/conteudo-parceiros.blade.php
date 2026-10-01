@@ -53,6 +53,59 @@
                     Criar Excel
                 </button>
 
+                {{-- ============= BOTAO TEMPORARIO: desconto 6,65% (remover depois) ============= --}}
+                <button id="btnDesconto665" onclick="aplicarDesconto665()"
+                        class="flex items-center gap-1 px-2 py-1 text-xs bg-amber-500 text-white rounded shadow hover:bg-amber-600 font-semibold">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 14.25 15 7.5M9.75 8.25h.008v.008H9.75V8.25Zm4.5 7.5h.008v.008h-.008v-.008ZM21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H4.5a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12" />
+                    </svg>
+                    Desconto 6,65%
+                </button>
+                <script>
+                    // BOTAO TEMPORARIO: recalcula a comissao dos parceiros da lista
+                    // da backoffice aplicando o desconto de 6,65% (remover depois)
+                    function aplicarDesconto665() {
+                        Swal.fire({
+                            title: 'Aplicar desconto de 6,65%?',
+                            html: '<span style="font-size:13px;color:#d1d5db">Recalcula as comissões pendentes dos parceiros da lista<br>(Ana Paula, Islene, Ivan, Morgana, Evelly, Emilly,<br>Thiago, Carolina e Brenda) com o desconto de 6,65%.</span>',
+                            icon: 'warning',
+                            background: '#1f2937', color: '#f3f4f6',
+                            showCancelButton: true,
+                            confirmButtonText: 'Sim, aplicar',
+                            cancelButtonText: 'Cancelar',
+                        }).then(async (result) => {
+                            if (!result.isConfirmed) return;
+                            const btn = document.getElementById('btnDesconto665');
+                            btn.disabled = true;
+                            try {
+                                const r = await fetch('{{ route('folha.america.parceiros.desconto665') }}', {
+                                    method: 'POST',
+                                    headers: {
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                        'Content-Type': 'application/json',
+                                    },
+                                });
+                                const data = await r.json();
+                                if (data.success) {
+                                    Swal.fire({
+                                        icon: 'success', title: 'Desconto aplicado!',
+                                        html: '<span style="font-size:13px;color:#d1d5db">' + data.total + ' parceiro(s) recalculado(s) com −6,65%.</span>',
+                                        background: '#1f2937', color: '#f3f4f6',
+                                        timer: 2500, showConfirmButton: false,
+                                    }).then(() => window.location.reload());
+                                } else {
+                                    Swal.fire({ icon: 'error', title: 'Erro', text: 'Não foi possível aplicar.', background: '#1f2937', color: '#f3f4f6' });
+                                }
+                            } catch (e) {
+                                Swal.fire({ icon: 'error', title: 'Erro', text: 'Falha de conexão.', background: '#1f2937', color: '#f3f4f6' });
+                            } finally {
+                                btn.disabled = false;
+                            }
+                        });
+                    }
+                </script>
+                {{-- ============= FIM BOTAO TEMPORARIO ============= --}}
+
             </div>
         </div>
 
