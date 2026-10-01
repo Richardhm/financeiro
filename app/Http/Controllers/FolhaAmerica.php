@@ -2084,6 +2084,14 @@ class FolhaAmerica extends Controller
 
             DB::beginTransaction();
 
+            // Competencia de referencia para recalculo de parceiros (folha aberta ou mes atual)
+            $folhaAbertaPdf = DB::table('folha_mes')
+                ->where('corretora_id', auth()->user()->corretora_id)
+                ->where('status', 0)
+                ->orderByDesc('mes')
+                ->value('mes');
+            $competenciaPdf = $folhaAbertaPdf ? Carbon::parse($folhaAbertaPdf)->format('Y-m') : now()->format('Y-m');
+
             // ConfiguraÃ§Ã£o inicial
             $totalProcessado = 0;
             $corretoresProcessados = 0;
@@ -2097,6 +2105,13 @@ class FolhaAmerica extends Controller
             foreach ($corretoresSelecionados as $corretorId) {
                 $corretor   = DB::table('users')->find($corretorId);
                 $isParceiro = ($corretor?->tipo_contrato === 'parceiro');
+
+                // Parceiro: recalcula a regra ANTES de montar o PDF, para o documento
+                // que a vendedora assina sair identico ao que o Finalizar vai pagar
+                // (percentuais atuais + desconto 6,65% quando a regra tiver a opcao)
+                if ($isParceiro) {
+                    $this->aplicarRegraParceiro((int) $corretorId, $competenciaPdf);
+                }
 
                 // Obter estornos
                 $estornos = DB::table('contratos')
@@ -2320,6 +2335,14 @@ class FolhaAmerica extends Controller
 
             DB::beginTransaction();
 
+            // Competencia de referencia para recalculo de parceiros (folha aberta ou mes atual)
+            $folhaAbertaPdf = DB::table('folha_mes')
+                ->where('corretora_id', auth()->user()->corretora_id)
+                ->where('status', 0)
+                ->orderByDesc('mes')
+                ->value('mes');
+            $competenciaPdf = $folhaAbertaPdf ? Carbon::parse($folhaAbertaPdf)->format('Y-m') : now()->format('Y-m');
+
             // ConfiguraÃ§Ã£o inicial
             $totalProcessado = 0;
             $corretoresProcessados = 0;
@@ -2333,6 +2356,12 @@ class FolhaAmerica extends Controller
             foreach ($corretoresSelecionados as $corretorId) {
                 $corretor = DB::table('users')->find($corretorId);
                 $isParceiro = ($corretor?->tipo_contrato === 'parceiro');
+
+                // Parceiro: recalcula a regra ANTES de montar o PDF (documento assinado
+                // pela vendedora = exatamente o que o Finalizar vai pagar)
+                if ($isParceiro) {
+                    $this->aplicarRegraParceiro((int) $corretorId, $competenciaPdf);
+                }
                 // Obter estornos
                 $estornos = DB::table('contratos')
                     ->join('clientes', 'contratos.cliente_id', '=', 'clientes.id')
