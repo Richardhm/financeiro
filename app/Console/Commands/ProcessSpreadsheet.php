@@ -406,6 +406,9 @@ class ProcessSpreadsheet extends Command
         // Use o valor_plano do contrato como base, excluindo o acrescimo da 1ª parcela
         $valorBase = (float) Contrato::where('id', $comissao->contrato_id)->value('valor_plano') ?: ($valorPago - 35);
 
+        // Opcao da regra: desconto de 6,65% (imposto) embutido na comissao
+        $fator665 = ($regra && $regra->desconto_665) ? (1 - 0.0665) : 1;
+
         for ($num = 1; $num <= $totalParcelas; $num++) {
             $pct  = $percentuais[$num] ?? 0;
             $data = Carbon::parse($dataVigencia)->addMonths($num - 1)->format('Y-m-d');
@@ -413,7 +416,7 @@ class ProcessSpreadsheet extends Command
             $ccl                   = new ComissoesCorretoresLancadas();
             $ccl->comissoes_id     = $comissao->id;
             $ccl->parcela          = $num;
-            $ccl->valor            = $pct > 0 ? round($valorBase * $pct / 100, 2) : 0;
+            $ccl->valor            = $pct > 0 ? round($valorBase * $pct / 100 * $fator665, 2) : 0;
             $ccl->porcentagem_paga = $pct;
             $ccl->data             = $data;
 

@@ -18,9 +18,11 @@ class ParceirosRegraComissao extends Model
         'parcela_4_pct',
         'parcela_5_pct',
         'parcela_6_pct',
+        'desconto_665',
     ];
 
     protected $casts = [
+        'desconto_665'  => 'boolean',
         'parcela_1_pct' => 'decimal:2',
         'parcela_2_pct' => 'decimal:2',
         'parcela_3_pct' => 'decimal:2',

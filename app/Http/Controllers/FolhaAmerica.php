@@ -5049,6 +5049,7 @@ class FolhaAmerica extends Controller
                 'parcela_4_pct' => $request->parcela_4_pct,
                 'parcela_5_pct' => $request->parcela_5_pct ?? 0,
                 'parcela_6_pct' => $request->parcela_6_pct ?? 0,
+                'desconto_665'  => $request->boolean('desconto_665'),
             ]
         );
 
@@ -5075,6 +5076,7 @@ class FolhaAmerica extends Controller
                 'parcela_4_pct' => $request->parcela_4_pct,
                 'parcela_5_pct' => $request->parcela_5_pct ?? 0,
                 'parcela_6_pct' => $request->parcela_6_pct ?? 0,
+                'desconto_665'  => $request->boolean('desconto_665'),
             ]);
 
         return response()->json(['ok' => true]);
@@ -5139,6 +5141,8 @@ class FolhaAmerica extends Controller
             ];
             // Desconto do vendedor cobrado UMA vez: na primeira parcela com valor
             $descontoPendente = (float) ($parcelas->first()->desconto_corretor ?? 0);
+            // Opcao da regra: desconto de 6,65% (imposto) embutido na comissao
+            $fator665 = $regra->desconto_665 ? (1 - 0.0665) : 1;
             foreach ($percentuais as $num => $pct) {
                 if ((float) $pct <= 0) continue;
                 $p = $parcelas->firstWhere('parcela', $num);
@@ -5146,7 +5150,7 @@ class FolhaAmerica extends Controller
                     DB::table('comissoes_corretores_lancadas')
                         ->where('id', $p->id)
                         ->update([
-                            'valor'            => round($baseCalc * (float) $pct / 100, 2),
+                            'valor'            => round($baseCalc * (float) $pct / 100 * $fator665, 2),
                             'porcentagem_paga' => (float) $pct,
                             'desconto'         => $descontoPendente,
                         ]);

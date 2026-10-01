@@ -94,6 +94,12 @@
                     <span id="total-pct" class="text-white font-bold text-sm">0%</span>
                     <span id="aviso-total" class="hidden text-xs text-red-400 ml-2">A soma ultrapassa 100%</span>
                 </div>
+                <label class="mt-3 flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" name="desconto_665" value="1"
+                           {{ old('desconto_665') ? 'checked' : '' }}
+                           class="w-4 h-4 rounded border-white/20 bg-gray-800 text-amber-500 focus:ring-amber-500">
+                    <span class="text-amber-300 text-sm font-medium">Aplicar desconto de 6,65% (imposto) na comissão</span>
+                </label>
             </div>
 
             <div class="flex justify-end">
@@ -157,7 +163,12 @@
                         $totalCor  = $totalPct > 100 ? 'text-red-400' : ($totalPct == 100 ? 'text-green-400' : 'text-yellow-400');
                     @endphp
                     <tr class="hover:bg-white/5">
-                        <td class="px-4 py-2.5 font-medium">{{ $nomePlano }}</td>
+                        <td class="px-4 py-2.5 font-medium">
+                            {{ $nomePlano }}
+                            @if($r->desconto_665)
+                                <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold align-middle" title="Desconto de 6,65% (imposto) aplicado na comissão">&minus;6,65%</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-2.5 text-center text-indigo-300">{{ number_format($r->parcela_1_pct, 2, ',', '.') }}%</td>
                         <td class="px-4 py-2.5 text-center text-indigo-300">{{ number_format($r->parcela_2_pct, 2, ',', '.') }}%</td>
                         <td class="px-4 py-2.5 text-center text-indigo-300">{{ number_format($r->parcela_3_pct, 2, ',', '.') }}%</td>
@@ -175,7 +186,8 @@
                                             {{ (float)$r->parcela_3_pct }},
                                             {{ (float)$r->parcela_4_pct }},
                                             {{ (float)$r->parcela_5_pct }},
-                                            {{ (float)$r->parcela_6_pct }}
+                                            {{ (float)$r->parcela_6_pct }},
+                                            {{ $r->desconto_665 ? 1 : 0 }}
                                         )"
                                         class="px-3 py-1 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded text-xs">
                                     Editar
@@ -232,6 +244,12 @@
                 <span id="edit-total-pct" class="text-white font-bold text-sm">0%</span>
                 <span id="edit-aviso-total" class="hidden text-xs text-red-400 ml-2">Ultrapassa 100%</span>
             </div>
+
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" id="edit-d665"
+                       class="w-4 h-4 rounded border-white/20 bg-gray-800 text-amber-500 focus:ring-amber-500">
+                <span class="text-amber-300 text-sm font-medium">Aplicar desconto de 6,65% (imposto) na comissão</span>
+            </label>
         </div>
 
         <div class="px-5 py-3 border-t border-white/10 flex justify-end gap-2">
@@ -261,7 +279,7 @@
     }
 
     // ---- Modal editar ----
-    function abrirModalEditar(id, planoNome, p1, p2, p3, p4, p5, p6) {
+    function abrirModalEditar(id, planoNome, p1, p2, p3, p4, p5, p6, d665) {
         document.getElementById('edit-id').value = id;
         document.getElementById('edit-plano-nome').textContent = planoNome;
         document.getElementById('edit-p1').value = p1;
@@ -270,6 +288,7 @@
         document.getElementById('edit-p4').value = p4;
         document.getElementById('edit-p5').value = p5 || 0;
         document.getElementById('edit-p6').value = p6 || 0;
+        document.getElementById('edit-d665').checked = !!d665;
         atualizarTotalModal();
         document.getElementById('modal-editar').classList.remove('hidden');
     }
@@ -295,6 +314,7 @@
             parcela_4_pct:  document.getElementById('edit-p4').value,
             parcela_5_pct:  document.getElementById('edit-p5').value,
             parcela_6_pct:  document.getElementById('edit-p6').value,
+            desconto_665:   document.getElementById('edit-d665').checked ? 1 : 0,
         };
 
         fetch(urlBase + '/' + id, {
